@@ -20,6 +20,7 @@
 #ifndef DELAY_JITTER_ESTIMATION_H
 #define DELAY_JITTER_ESTIMATION_H
 
+#include "ns3/object.h"
 #include "ns3/nstime.h"
 #include "ns3/packet.h"
 
@@ -31,7 +32,7 @@ namespace ns3 {
  * \brief quick and dirty delay and jitter estimation
  *
  */
-class DelayJitterEstimation
+class DelayJitterEstimation : public Object
 {
 public:
   DelayJitterEstimation ();
@@ -47,6 +48,9 @@ public:
    * taken into account in transmission delay calculations.
    */
   static void PrepareTx (Ptr<const Packet> packet);
+
+  static bool IsMarked (Ptr<const Packet> packet);
+
   /**
    * \param packet the packet received
    *

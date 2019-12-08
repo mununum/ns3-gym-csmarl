@@ -121,6 +121,12 @@ DelayJitterEstimation::PrepareTx (Ptr<const Packet> packet)
   DelayJitterEstimationTimestampTag tag;
   packet->AddByteTag (tag);
 }
+bool
+DelayJitterEstimation::IsMarked (Ptr<const Packet> packet)
+{
+  DelayJitterEstimationTimestampTag tag;
+  return packet->FindFirstMatchingByteTag (tag);
+}
 void
 DelayJitterEstimation::RecordRx (Ptr<const Packet> packet)
 {

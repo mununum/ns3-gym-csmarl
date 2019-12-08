@@ -461,6 +461,7 @@ Txop::NotifyAccessGranted (void)
       NS_ASSERT (item != 0);
       m_currentPacket = item->GetPacket ();
       m_currentHdr = item->GetHeader ();
+      m_currentHdr.m_packet = (void *) PeekPointer(m_currentPacket);
       NS_ASSERT (m_currentPacket != 0);
       uint16_t sequence = m_txMiddle->GetNextSequenceNumberFor (&m_currentHdr);
       m_currentHdr.SetSequenceNumber (sequence);

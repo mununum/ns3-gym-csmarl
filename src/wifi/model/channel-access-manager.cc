@@ -20,6 +20,8 @@
 
 #include "ns3/log.h"
 #include "ns3/simulator.h"
+#include "ns3/wifi-mac-queue.h"
+#include "ns3/delay-jitter-estimation.h"
 #include "channel-access-manager.h"
 #include "txop.h"
 #include "wifi-phy-listener.h"
@@ -281,6 +283,16 @@ void
 ChannelAccessManager::RequestAccess (Ptr<Txop> state, bool isCfPeriod)
 {
   NS_LOG_FUNCTION (this << state);
+
+  // Mark the HOL packet tag
+  {
+    Ptr<WifiMacQueue> queue = state->GetWifiMacQueue ();
+    Ptr<const Packet> p = queue->Peek ()->GetPacket ();
+    if (p && !DelayJitterEstimation::IsMarked (p)) {
+      DelayJitterEstimation::PrepareTx (p);
+    }
+  }
+
   //Deny access if in sleep mode or off
   if (m_sleeping || m_off)
     {

@@ -43,3 +43,5 @@ build/
 *.pb.cc
 *_pb2.py
 *_pb3.py
+.vscode/settings.json
+.vscode/c_cpp_properties.json

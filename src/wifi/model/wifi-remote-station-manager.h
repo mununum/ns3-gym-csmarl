@@ -66,6 +66,9 @@ public:
    * \returns the frame error rate
    */
   double GetFrameErrorRate () const;
+
+  void Reset (); // reset the frame error rate statistics
+
 private:
   /**
    * \brief Calculate averaging coefficient for frame error rate. Depends on time of the last update.
@@ -846,6 +849,10 @@ public:
    */
   WifiRemoteStationInfo GetInfo (Mac48Address address);
   /**
+   * \return the aggregated information of all remote stations
+   */
+  WifiRemoteStationInfo GetAggInfo (void); // aggregated info for all remote stations
+  /**
    * Set the default transmission power level
    *
    * \param txPower the default transmission power level
@@ -1457,6 +1464,8 @@ private:
   bool m_rifsPermitted;        //!< flag if RIFS is enabled
   ProtectionMode m_erpProtectionMode; //!< Protection mode for ERP stations when non-ERP stations are detected
   ProtectionMode m_htProtectionMode;  //!< Protection mode for HT stations when non-HT stations are detected
+
+  WifiRemoteStationInfo m_agg_info; // aggregated info for all remote stations
 
   /**
    * The trace source fired when the transmission of a single RTS has failed

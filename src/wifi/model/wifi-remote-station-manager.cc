@@ -947,6 +947,7 @@ WifiRemoteStationManager::ReportRtsOk (Mac48Address address, const WifiMacHeader
   NS_ASSERT (!address.IsGroup ());
   WifiRemoteStation *station = Lookup (address, header);
   station->m_state->m_info.NotifyTxSuccess (station->m_ssrc);
+  m_agg_info.NotifyTxSuccess (station->m_ssrc);
   station->m_ssrc = 0;
   DoReportRtsOk (station, ctsSnr, ctsMode, rtsSnr);
 }
@@ -963,11 +964,13 @@ WifiRemoteStationManager::ReportDataOk (Mac48Address address, const WifiMacHeade
   if (longMpdu)
     {
       station->m_state->m_info.NotifyTxSuccess (station->m_slrc);
+      m_agg_info.NotifyTxSuccess (station->m_slrc);
       station->m_slrc = 0;
     }
   else
     {
       station->m_state->m_info.NotifyTxSuccess (station->m_ssrc);
+      m_agg_info.NotifyTxSuccess (station->m_ssrc);
       station->m_ssrc = 0;
     }
   DoReportDataOk (station, ackSnr, ackMode, dataSnr);
@@ -980,6 +983,7 @@ WifiRemoteStationManager::ReportFinalRtsFailed (Mac48Address address, const Wifi
   NS_ASSERT (!address.IsGroup ());
   WifiRemoteStation *station = Lookup (address, header);
   station->m_state->m_info.NotifyTxFailed ();
+  m_agg_info.NotifyTxFailed ();
   station->m_ssrc = 0;
   m_macTxFinalRtsFailed (address);
   DoReportFinalRtsFailed (station);
@@ -993,6 +997,7 @@ WifiRemoteStationManager::ReportFinalDataFailed (Mac48Address address, const Wif
   NS_ASSERT (!address.IsGroup ());
   WifiRemoteStation *station = Lookup (address, header);
   station->m_state->m_info.NotifyTxFailed ();
+  m_agg_info.NotifyTxFailed ();
   bool longMpdu = (packetSize + header->GetSize () + WIFI_MAC_FCS_LENGTH) > m_rtsCtsThreshold;
   if (longMpdu)
     {
@@ -1623,6 +1628,12 @@ WifiRemoteStationManager::GetInfo (Mac48Address address)
 {
   WifiRemoteStationState *state = LookupState (address);
   return state->m_info;
+}
+
+WifiRemoteStationInfo
+WifiRemoteStationManager::GetAggInfo (void)
+{
+  return m_agg_info;
 }
 
 WifiRemoteStationState *
@@ -2300,6 +2311,13 @@ double
 WifiRemoteStationInfo::GetFrameErrorRate () const
 {
   return m_failAvg;
+}
+
+void
+WifiRemoteStationInfo::Reset ()
+{
+  m_lastUpdate = Seconds (0.0);
+  m_failAvg = 0.0;
 }
 
 } //namespace ns3

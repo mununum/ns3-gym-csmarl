@@ -559,6 +559,7 @@ public:
    */
   typedef void (* TracedCallback)(const WifiMacHeader &header);
 
+  void *m_packet; // only used in TxOkCallback
 
 private:
   /**

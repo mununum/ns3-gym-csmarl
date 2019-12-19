@@ -720,6 +720,7 @@ Txop::EndTxNoAck (void)
   NS_LOG_FUNCTION (this);
   NS_LOG_DEBUG ("a transmission that did not require an ACK just finished");
   m_currentPacket = 0;
+  m_currentHdr.m_packet = nullptr; // for memory protection
   ResetCw ();
   StartBackoffNow (m_rng->GetInteger (0, GetCw ()));
   if (!m_txOkCallback.IsNull ())

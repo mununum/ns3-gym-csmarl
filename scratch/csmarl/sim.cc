@@ -18,6 +18,10 @@ NS_LOG_COMPONENT_DEFINE ("OpenGym");
 
 int main (int argc, char *argv[])
 {
+
+    // LogComponentEnable("Txop", LOG_LEVEL_DEBUG);
+    // LogComponentEnable("ArpL3Protocol", LOG_LEVEL_LOGIC);
+
     // Parameters of the environment
     uint32_t simSeed = 1;
     double simulationTime = 10; // seconds
@@ -209,7 +213,6 @@ int main (int argc, char *argv[])
     myGymEnv->SetOpenGymInterface(openGymInterface);
 
     // connect OpenGym entity to RX event source
-    // TODO restore
     Ptr<UdpServer> udpServer = DynamicCast<UdpServer>(sinkApps.Get(0));
     // udpServer->TraceConnectWithoutContext ("Rx", MakeCallback (&DestRxPkt));
     udpServer->TraceConnectWithoutContext ("Rx", MakeBoundCallback (&MyGymEnv::CountRxPkts, myGymEnv, dstNode));
@@ -231,6 +234,8 @@ int main (int argc, char *argv[])
     Simulator::Stop (Seconds (simulationTime));
     Simulator::Run ();
     NS_LOG_UNCOND ("Simulation stop");
+
+    openGymInterface->NotifySimulationEnd ();
 
     Simulator::Destroy ();
 

@@ -57,12 +57,20 @@ MyGymEnv::MyGymEnv (NodeContainer agents, Time stepTime, bool enabled=true)
     m_agents = agents;
     m_interval = stepTime;
     m_enabled = enabled;
+
+    m_continuous = true;
     
     // initialize per-agent internal state
     uint32_t numAgents = m_agents.GetN ();
     for (uint32_t i = 0; i < numAgents; i++) {
         m_agent_state.push_back (CreateObject<MyGymNodeState> ());
     }
+
+    // make initial configuration for testing
+    // for (uint32_t i=0; i<numAgents; i++) {
+    //     Ptr<Node> node = m_agents.Get (i);
+    //     SetCw(node, 256, 256);
+    // }
 
     Simulator::Schedule (Seconds(0.0), &MyGymEnv::ScheduleNextStateRead, this);
 }
@@ -76,6 +84,11 @@ MyGymEnv::ScheduleNextStateRead ()
     // notify to python-end only when enabled
     if (m_enabled)
         Notify();
+    else {
+        GetReward();
+        GetGameOver();
+        GetObservation();
+    }
 }
 
 MyGymEnv::~MyGymEnv ()
@@ -106,13 +119,24 @@ MyGymEnv::GetActionSpace()
 {
     NS_LOG_FUNCTION (this);
     uint32_t nodeNum = m_agents.GetN ();
-    float low = 0.0;
-    float high = 100.0;
+    // float low = 1.0;
+    // float high = 1024.0;
     std::vector<uint32_t> shape = {nodeNum,};
-    std::string dtype = TypeNameGet<uint32_t> ();
-    Ptr<OpenGymBoxSpace> space = CreateObject<OpenGymBoxSpace> (low, high, shape, dtype);
-    NS_LOG_UNCOND ("GetActionSpace: " << space);
-    return space;
+    if (m_continuous) {
+        float low = -1e5;
+        float high = +1e5;
+        std::string dtype = TypeNameGet<float> ();
+        Ptr<OpenGymBoxSpace> space = CreateObject<OpenGymBoxSpace> (low, high, shape, dtype);
+        NS_LOG_UNCOND ("GetActionSpace: " << space);
+        return space;
+    } else {
+        float low = 0.0;
+        float high = 9.0;
+        std::string dtype = TypeNameGet<int32_t> ();
+        Ptr<OpenGymBoxSpace> space = CreateObject<OpenGymBoxSpace> (low, high, shape, dtype);
+        NS_LOG_UNCOND ("GetActionSpace: " << space);
+        return space;
+    }
 }
 
 Ptr<OpenGymSpace>
@@ -128,7 +152,7 @@ MyGymEnv::GetObservationSpace()
     float high = 100.0;
 
     // std::vector<uint32_t> shape = {nodeNum,};
-    std::string dtype = TypeNameGet<double> ();
+    std::string dtype = TypeNameGet<float> ();
     // Ptr<OpenGymBoxSpace> space = CreateObject<OpenGymBoxSpace> (low, high, shape, dtype);
     Ptr<OpenGymBoxSpace> space = CreateObject<OpenGymBoxSpace> (low, high, m_obs_shape, dtype);
     NS_LOG_UNCOND ("GetObservationSpace: " << space);
@@ -163,7 +187,7 @@ MyGymEnv::GetObservation()
 {
     NS_LOG_FUNCTION (this);
     // uint32_t nodeNum = NodeList::GetNNodes ();
-    Ptr<OpenGymBoxContainer<double>> box = CreateObject<OpenGymBoxContainer<double>>(m_obs_shape);
+    Ptr<OpenGymBoxContainer<float>> box = CreateObject<OpenGymBoxContainer<float>>(m_obs_shape);
 
     uint32_t numAgents = m_agents.GetN ();
     for (uint32_t i = 0; i < numAgents; i++) {
@@ -172,7 +196,8 @@ MyGymEnv::GetObservation()
         // collect statistics
         // TODO make proper normalization
         // Throughput
-        double thpt = m_agent_state[i]->m_txPktBytes / 1000;
+        double thpt = m_agent_state[i]->m_txPktBytes;
+        thpt /= 1000;
         // Latency
         double lat;
         if (m_agent_state[i]->m_txPktCount > 0) {
@@ -254,15 +279,26 @@ MyGymEnv::SetCw(Ptr<Node> node, uint32_t cwMinValue, uint32_t cwMaxValue)
     Ptr<Txop> txop = ptr.Get<Txop> ();
 
     // if both set to the same value then we have uniform backoff?
-    if (cwMinValue != 0) {
-        NS_LOG_DEBUG ("Set CW min: " << cwMinValue);
-        txop->SetMinCw(cwMinValue);
-    }
+    uint32_t minValue = 1.0;
+    uint32_t maxValue = 1023.0;
 
-    if (cwMaxValue != 0) {
-        NS_LOG_DEBUG ("Set CW max: " << cwMaxValue);
-        txop->SetMaxCw(cwMaxValue);
-    }
+    cwMinValue = std::max(cwMinValue, minValue);
+    cwMinValue = std::min(cwMinValue, maxValue);
+    txop->SetMinCw (cwMinValue);
+
+    cwMaxValue = std::max(cwMaxValue, minValue);
+    cwMaxValue = std::min(cwMaxValue, maxValue);
+    txop->SetMaxCw (cwMaxValue);
+
+    // if (cwMinValue > 0 && cwMinValue < 1024) {
+    //     NS_LOG_DEBUG ("Set CW min: " << cwMinValue);
+    //     txop->SetMinCw(cwMinValue);
+    // }
+
+    // if (cwMaxValue > 0 && cwMaxValue < 1024) {
+    //     NS_LOG_DEBUG ("Set CW max: " << cwMaxValue);
+    //     txop->SetMaxCw(cwMaxValue);
+    // }
 
     return true;
 }
@@ -272,14 +308,51 @@ MyGymEnv::ExecuteActions(Ptr<OpenGymDataContainer> action)
 {
     NS_LOG_FUNCTION (this);
     NS_LOG_UNCOND ("MyExecuteActions: " << action);
-    Ptr<OpenGymBoxContainer<uint32_t>> box = DynamicCast<OpenGymBoxContainer<uint32_t>>(action);
-    std::vector<uint32_t> actionVector = box->GetData();
 
     uint32_t agentNum = m_agents.GetN ();
-    for (uint32_t i=0; i<agentNum; i++) {
-        Ptr<Node> node = m_agents.Get (i);
-        uint32_t cwSize = actionVector.at(i);
-        SetCw(node, cwSize, cwSize);
+
+    if (m_continuous) {
+
+        Ptr<OpenGymBoxContainer<float>> box = DynamicCast<OpenGymBoxContainer<float>>(action);
+        std::vector<float> actionVector = box->GetData();
+        
+        for (uint32_t i=0; i<agentNum; i++) {
+            // Continuous action to change CW
+            Ptr<Node> node = m_agents.Get (i);
+            Ptr<NetDevice> dev = node->GetDevice (0);
+            Ptr<WifiNetDevice> wifi_dev = DynamicCast<WifiNetDevice> (dev);
+            Ptr<WifiMac> wifi_mac = wifi_dev->GetMac ();
+            Ptr<RegularWifiMac> rmac = DynamicCast<RegularWifiMac> (wifi_mac);
+            PointerValue ptr;
+            rmac->GetAttribute ("Txop", ptr);
+            Ptr<Txop> txop = ptr.Get<Txop> ();
+            double mincw = txop->GetMinCw ();
+
+            float change_ratio = actionVector.at(i);
+            float damping_factor = 0.01;
+            if (change_ratio >= 0) {
+                uint32_t newcw = mincw * (1 + change_ratio * damping_factor);
+                SetCw(node, newcw, newcw);
+            } else {
+                uint32_t newcw = mincw / (1 - change_ratio * damping_factor);
+                SetCw(node, newcw, newcw);
+            }
+        }
+
+    } else {
+
+        Ptr<OpenGymBoxContainer<int32_t>> box = DynamicCast<OpenGymBoxContainer<int32_t>>(action);
+        std::vector<int32_t> actionVector = box->GetData();
+
+        for (uint32_t i=0; i<agentNum; i++) {
+            Ptr<Node> node = m_agents.Get (i);
+
+            int32_t exponent = actionVector.at(i) + 1;
+            // CW range: 2^1-1 ~ 2^10-1
+            uint32_t cwSize = std::pow(2, exponent) - 1;
+            SetCw(node, cwSize, cwSize);
+        }
+        
     }
 
     return true;
@@ -321,14 +394,14 @@ MyGymEnv::SrcTxDone(Ptr<MyGymEnv> entity, Ptr<Node> node, uint32_t idx, const Wi
 {
     Packet *packet = (Packet *) hdr.m_packet;
 
-
-
-    // record TX throughput and latency
-    Ptr<MyGymNodeState> state = entity->m_agent_state[idx];
-    state->m_txPktCount++;
-    state->m_txPktBytes += packet->GetSize ();
-    state->m_delay_estimator->RecordRx (packet);
-    state->m_delaySum += state->m_delay_estimator->GetLastDelay ();
+    if (packet) {
+        // record TX throughput and latency only when it is a unicast frame
+        Ptr<MyGymNodeState> state = entity->m_agent_state[idx];
+        state->m_txPktCount++;
+        state->m_txPktBytes += packet->GetSize ();
+        state->m_delay_estimator->RecordRx (packet);
+        state->m_delaySum += state->m_delay_estimator->GetLastDelay ();
+    }
 
     // entity->m_delay_estimator->RecordRx (packet);
 

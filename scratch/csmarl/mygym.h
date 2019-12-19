@@ -53,6 +53,7 @@ private:
     uint64_t m_rxPktNum;
 
     bool m_enabled;
+    bool m_continuous;
     // Ptr<DelayJitterEstimation> m_delay_estimator;
 
 };

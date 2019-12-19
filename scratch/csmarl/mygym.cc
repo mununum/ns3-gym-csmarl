@@ -417,7 +417,9 @@ MyGymEnv::SrcTxFail(Ptr<MyGymEnv> entity, Ptr<Node> node, uint32_t idx, const Wi
 {
     Packet *packet = (Packet *) hdr.m_packet;
 
-    NS_LOG_UNCOND ("Node with ID " << node->GetId() << " has failed to send a packet with size " << packet->GetSize());
+    if (packet) {
+        NS_LOG_UNCOND ("Node with ID " << node->GetId() << " has failed to send a packet with size " << packet->GetSize());
+    }
 }
 
 } // ns3 namespace

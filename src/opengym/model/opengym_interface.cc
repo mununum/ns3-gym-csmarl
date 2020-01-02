@@ -264,6 +264,8 @@ OpenGymInterface::NotifyCurrentState()
   m_zmq_socket.recv (&reply);
   envActMsg.ParseFromArray(reply.data(), reply.size());
 
+  NS_LOG_DEBUG ("[cc] Action received");
+
   if (m_simEnd) {
     // if sim end only rx ms and quit
     return;

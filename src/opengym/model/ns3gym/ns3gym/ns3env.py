@@ -24,7 +24,7 @@ __email__ = "gawlowicz@tkn.tu-berlin.de"
 
 class Ns3ZmqBridge(object):
     """docstring for Ns3ZmqBridge"""
-    def __init__(self, port=0, startSim=True, simSeed=0, simArgs={}, debug=False):
+    def __init__(self, port=0, startSim=True, simSeed=0, simArgs={}, debug=False, cwd=None):
         super(Ns3ZmqBridge, self).__init__()
         port = int(port)
         self.port = port
@@ -35,6 +35,8 @@ class Ns3ZmqBridge(object):
         self.simPid = None
         self.wafPid = None
         self.ns3Process = None
+
+        self.debug = debug
 
         context = zmq.Context()
         self.socket = context.socket(zmq.REP)
@@ -63,7 +65,9 @@ class Ns3ZmqBridge(object):
 
         if self.startSim:
             # run simulation script
-            self.ns3Process = start_sim_script(port, simSeed, simArgs, debug)
+            from ns3gym.start_sim import start_sim_script_without_waf
+            self.ns3Process = start_sim_script_without_waf(port, simSeed, simArgs, debug, cwd=cwd)
+            # self.ns3Process = start_sim_script(port, simSeed, simArgs, debug, cwd=cwd)
         else:
             print("Waiting for simulation script to connect on port: tcp://localhost:{}".format(port))
             print('Please start proper ns-3 simulation script using ./waf --run "..."')
@@ -178,6 +182,7 @@ class Ns3ZmqBridge(object):
             return
 
         request = self.socket.recv()
+        print("[py] State received") if self.debug else None
         envStateMsg = pb.EnvStateMsg()
         envStateMsg.ParseFromString(request)
 
@@ -255,6 +260,7 @@ class Ns3ZmqBridge(object):
                 data = boxContainerPb.floatData
 
             # TODO: reshape using shape info
+            # NOTE currently this is handled in upper layer
             return data
 
         elif (dataContainerPb.type == pb.Tuple):
@@ -360,7 +366,7 @@ class Ns3ZmqBridge(object):
 
 
 class Ns3Env(gym.Env):
-    def __init__(self, stepTime=0, port=0, startSim=True, simSeed=0, simArgs={}, debug=False):
+    def __init__(self, stepTime=0, port=0, startSim=True, simSeed=0, simArgs={}, debug=False, cwd=None):
         self.stepTime = stepTime
         self.port = port
         self.startSim = startSim
@@ -377,7 +383,8 @@ class Ns3Env(gym.Env):
         self.state = None
         self.steps_beyond_done = None
 
-        self.ns3ZmqBridge = Ns3ZmqBridge(self.port, self.startSim, self.simSeed, self.simArgs, self.debug)
+        self.cwd = cwd
+        self.ns3ZmqBridge = Ns3ZmqBridge(self.port, self.startSim, self.simSeed, self.simArgs, self.debug, cwd=self.cwd)
         self.ns3ZmqBridge.initialize_env(self.stepTime)
         self.action_space = self.ns3ZmqBridge.get_action_space()
         self.observation_space = self.ns3ZmqBridge.get_observation_space()
@@ -412,7 +419,7 @@ class Ns3Env(gym.Env):
             self.ns3ZmqBridge = None
 
         self.envDirty = False
-        self.ns3ZmqBridge = Ns3ZmqBridge(self.port, self.startSim, self.simSeed, self.simArgs, self.debug)
+        self.ns3ZmqBridge = Ns3ZmqBridge(self.port, self.startSim, self.simSeed, self.simArgs, self.debug, cwd=self.cwd)
         self.ns3ZmqBridge.initialize_env(self.stepTime)
         self.action_space = self.ns3ZmqBridge.get_action_space()
         self.observation_space = self.ns3ZmqBridge.get_observation_space()

@@ -21,6 +21,7 @@ int main (int argc, char *argv[])
 
     // LogComponentEnable("Txop", LOG_LEVEL_DEBUG);
     // LogComponentEnable("ArpL3Protocol", LOG_LEVEL_LOGIC);
+    // LogComponentEnable("OpenGymInterface", LOG_LEVEL_DEBUG);
 
     // Parameters of the environment
     uint32_t simSeed = 1;
@@ -28,6 +29,10 @@ int main (int argc, char *argv[])
     double envStepTime = 0.1; // seconds, ns3gym env step time interval
     uint32_t openGymPort = 5555;
     uint32_t testArg = 0;
+    bool continuous = false;
+
+    // OpenGym Env
+    bool opengym_enabled = true;
 
     // Parameters of the scenario
     uint32_t nodeNum = 2;
@@ -61,6 +66,8 @@ int main (int argc, char *argv[])
     cmd.AddValue ("stepTime", "Step time of the environment, Default: 0.1s", envStepTime);
     cmd.AddValue ("nodeNum", "Number of nodes. Default: 2", nodeNum);
     cmd.AddValue ("distance", "Inter node distance. Default: 10m", distance);
+    cmd.AddValue ("continuous", "Use continuous action space. Default: false", continuous);
+    cmd.AddValue ("opengym_enabled", "Using openAI gym or not. Default: true", opengym_enabled);
     cmd.AddValue ("testArg", "Extra simulation argument. Default: 0", testArg);
     cmd.Parse (argc, argv);
 
@@ -200,15 +207,12 @@ int main (int argc, char *argv[])
         NS_LOG_UNCOND ("---Node ID: " << node->GetId() << " Positions: " << mobility->GetPosition());
     }
 
-    // OpenGym Env
-    bool opengym_enabled = true;
-
     // Ptr<NodeContainer> agents = CreateObject<NodeContainer> ();
     NodeContainer agents;
     agents.Add (srcNode);
 
     Ptr<OpenGymInterface> openGymInterface = CreateObject<OpenGymInterface> (openGymPort);
-    Ptr<MyGymEnv> myGymEnv = CreateObject<MyGymEnv> (agents, Seconds(envStepTime), opengym_enabled);
+    Ptr<MyGymEnv> myGymEnv = CreateObject<MyGymEnv> (agents, Seconds(envStepTime), opengym_enabled, continuous);
     
     myGymEnv->SetOpenGymInterface(openGymInterface);
 

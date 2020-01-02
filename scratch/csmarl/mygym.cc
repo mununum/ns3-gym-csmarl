@@ -10,6 +10,10 @@
 
 namespace ns3 {
 
+NS_LOG_COMPONENT_DEFINE ("MyGymEnv");
+
+NS_OBJECT_ENSURE_REGISTERED (MyGymEnv);
+
 class MyGymNodeState : public Object {
 
     friend class MyGymEnv;
@@ -33,10 +37,6 @@ private:
 
 };
 
-NS_LOG_COMPONENT_DEFINE ("MyGymEnv");
-
-NS_OBJECT_ENSURE_REGISTERED (MyGymEnv);
-
 // for event-based env
 // MyGymEnv::MyGymEnv ()
 // {
@@ -49,7 +49,7 @@ MyGymEnv::MyGymEnv ()
     NS_LOG_FUNCTION (this);
 }
 
-MyGymEnv::MyGymEnv (NodeContainer agents, Time stepTime, bool enabled=true)
+MyGymEnv::MyGymEnv (NodeContainer agents, Time stepTime, bool enabled=true, bool continuous=false)
 {
     NS_LOG_FUNCTION (this);
     // m_currentNode = 0;
@@ -58,7 +58,7 @@ MyGymEnv::MyGymEnv (NodeContainer agents, Time stepTime, bool enabled=true)
     m_interval = stepTime;
     m_enabled = enabled;
 
-    m_continuous = true;
+    m_continuous = continuous;
     
     // initialize per-agent internal state
     uint32_t numAgents = m_agents.GetN ();
@@ -121,20 +121,28 @@ MyGymEnv::GetActionSpace()
     uint32_t nodeNum = m_agents.GetN ();
     // float low = 1.0;
     // float high = 1024.0;
-    std::vector<uint32_t> shape = {nodeNum,};
     if (m_continuous) {
+        std::vector<uint32_t> shape = {nodeNum,};
         float low = -1e5;
         float high = +1e5;
         std::string dtype = TypeNameGet<float> ();
         Ptr<OpenGymBoxSpace> space = CreateObject<OpenGymBoxSpace> (low, high, shape, dtype);
-        NS_LOG_UNCOND ("GetActionSpace: " << space);
+        NS_LOG_DEBUG ("GetActionSpace: " << space);
         return space;
     } else {
-        float low = 0.0;
-        float high = 9.0;
-        std::string dtype = TypeNameGet<int32_t> ();
-        Ptr<OpenGymBoxSpace> space = CreateObject<OpenGymBoxSpace> (low, high, shape, dtype);
-        NS_LOG_UNCOND ("GetActionSpace: " << space);
+
+        int n_actions = 10;
+        Ptr<OpenGymTupleSpace> space = CreateObject<OpenGymTupleSpace> ();
+
+        for(uint32_t i = 0; i < nodeNum; i++) {
+            space->Add (CreateObject<OpenGymDiscreteSpace> (n_actions));
+        }
+
+        // float low = 0.0;
+        // float high = 9.0;
+        // std::string dtype = TypeNameGet<int32_t> ();
+        // Ptr<OpenGymBoxSpace> space = CreateObject<OpenGymBoxSpace> (low, high, shape, dtype);
+        NS_LOG_DEBUG ("GetActionSpace: " << space);
         return space;
     }
 }
@@ -149,13 +157,13 @@ MyGymEnv::GetObservationSpace()
 
     // TODO change
     float low = 0.0;
-    float high = 100.0;
+    float high = 2000.0;
 
     // std::vector<uint32_t> shape = {nodeNum,};
     std::string dtype = TypeNameGet<float> ();
     // Ptr<OpenGymBoxSpace> space = CreateObject<OpenGymBoxSpace> (low, high, shape, dtype);
     Ptr<OpenGymBoxSpace> space = CreateObject<OpenGymBoxSpace> (low, high, m_obs_shape, dtype);
-    NS_LOG_UNCOND ("GetObservationSpace: " << space);
+    NS_LOG_DEBUG ("GetObservationSpace: " << space);
     return space;
 }
 
@@ -164,7 +172,7 @@ MyGymEnv::GetGameOver()
 {
     NS_LOG_FUNCTION (this);
     bool isGameOver = false;
-    NS_LOG_UNCOND ("MyGetGameOver: " << isGameOver);
+    NS_LOG_DEBUG ("MyGetGameOver: " << isGameOver);
     return isGameOver;
 }
 
@@ -239,7 +247,7 @@ MyGymEnv::GetObservation()
     //     box->AddValue(value);
     // }
 
-    NS_LOG_UNCOND ("MyGetObservation: " << box);
+    NS_LOG_DEBUG ("MyGetObservation: " << box);
     return box;
 }
 
@@ -250,7 +258,7 @@ MyGymEnv::GetReward()
     static float lastValue = 0.0;
     float reward = m_rxPktNum - lastValue;
     lastValue = m_rxPktNum;
-    NS_LOG_UNCOND ("MyGetReward: " << reward);
+    NS_LOG_DEBUG ("MyGetReward: " << reward);
     return reward;
 }
 
@@ -258,7 +266,7 @@ std::string
 MyGymEnv::GetExtraInfo()
 {
     NS_LOG_FUNCTION (this);
-    std::string myInfo = "currentNodeId";
+    std::string myInfo = "MyInfo=0";
     // myInfo += "=";
     // if (m_currentNode) {
     //     myInfo += std::to_string(m_currentNode->GetId());
@@ -307,7 +315,7 @@ bool
 MyGymEnv::ExecuteActions(Ptr<OpenGymDataContainer> action)
 {
     NS_LOG_FUNCTION (this);
-    NS_LOG_UNCOND ("MyExecuteActions: " << action);
+    NS_LOG_DEBUG ("MyExecuteActions: " << action);
 
     uint32_t agentNum = m_agents.GetN ();
 
@@ -341,17 +349,28 @@ MyGymEnv::ExecuteActions(Ptr<OpenGymDataContainer> action)
 
     } else {
 
-        Ptr<OpenGymBoxContainer<int32_t>> box = DynamicCast<OpenGymBoxContainer<int32_t>>(action);
-        std::vector<int32_t> actionVector = box->GetData();
+        Ptr<OpenGymTupleContainer> tuple = DynamicCast<OpenGymTupleContainer>(action);
 
-        for (uint32_t i=0; i<agentNum; i++) {
+        for (uint32_t i = 0; i < agentNum; i++) {
             Ptr<Node> node = m_agents.Get (i);
 
-            int32_t exponent = actionVector.at(i) + 1;
-            // CW range: 2^1-1 ~ 2^10-1
+            Ptr<OpenGymDiscreteContainer> action_i = DynamicCast<OpenGymDiscreteContainer>(tuple->Get (i));
+            uint32_t exponent = action_i->GetValue ();
             uint32_t cwSize = std::pow(2, exponent) - 1;
             SetCw(node, cwSize, cwSize);
         }
+
+        // Ptr<OpenGymBoxContainer<int32_t>> box = DynamicCast<OpenGymBoxContainer<int32_t>>(action);
+        // std::vector<int32_t> actionVector = box->GetData();
+
+        // for (uint32_t i=0; i<agentNum; i++) {
+        //     Ptr<Node> node = m_agents.Get (i);
+
+        //     int32_t exponent = actionVector.at(i) + 1;
+        //     // CW range: 2^1-1 ~ 2^10-1
+        //     uint32_t cwSize = std::pow(2, exponent) - 1;
+        //     SetCw(node, cwSize, cwSize);
+        // }
         
     }
 
@@ -418,7 +437,7 @@ MyGymEnv::SrcTxFail(Ptr<MyGymEnv> entity, Ptr<Node> node, uint32_t idx, const Wi
     Packet *packet = (Packet *) hdr.m_packet;
 
     if (packet) {
-        NS_LOG_UNCOND ("Node with ID " << node->GetId() << " has failed to send a packet with size " << packet->GetSize());
+        NS_LOG_DEBUG ("Node with ID " << node->GetId() << " has failed to send a packet with size " << packet->GetSize());
     }
 }
 

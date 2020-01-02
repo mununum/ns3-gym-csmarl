@@ -18,7 +18,7 @@ class MyGymEnv : public OpenGymEnv
 {
 public:
     MyGymEnv (); // for typeid registration
-    MyGymEnv (NodeContainer agents, Time stepTime, bool enabled);
+    MyGymEnv (NodeContainer agents, Time stepTime, bool enabled, bool continuous);
 
     virtual ~MyGymEnv ();
     static TypeId GetTypeId (void);

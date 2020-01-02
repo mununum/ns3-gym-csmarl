@@ -1,3 +1,4 @@
+import argparse
 import logging
 import os
 import gym
@@ -10,6 +11,9 @@ from ray import tune
 # from ray.rllib.utils import try_import_tf
 
 # tf = try_import_tf()
+
+parser = argparse.ArgumentParser()
+parser.add_argument("--testArg", type=int, default=200)
 
 # NOTE unused
 class Ns3EnvInherit(ns3env.Ns3Env):
@@ -60,6 +64,9 @@ class Ns3EnvWrapper(gym.Env):
 
 
 if __name__ == "__main__":
+
+    args = parser.parse_args()
+    # args.testArg
 
     # ray.init(local_mode=False, logging_level=logging.DEBUG)
     ray.init()

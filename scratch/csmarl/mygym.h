@@ -17,47 +17,51 @@ class MyGymNodeState;
 class MyGymEnv : public OpenGymEnv
 {
 public:
-    MyGymEnv (); // for typeid registration
-    MyGymEnv (NodeContainer agents, Time stepTime, bool enabled, bool continuous);
+  MyGymEnv (); // for typeid registration
+  MyGymEnv (NodeContainer agents, Time stepTime, bool enabled, bool continuous, bool dynamicInterval);
 
-    virtual ~MyGymEnv ();
-    static TypeId GetTypeId (void);
-    virtual void DoDispose ();
+  virtual ~MyGymEnv ();
+  static TypeId GetTypeId (void);
+  virtual void DoDispose ();
 
-    Ptr<OpenGymSpace> GetActionSpace();
-    Ptr<OpenGymSpace> GetObservationSpace();
-    bool GetGameOver();
-    Ptr<OpenGymDataContainer> GetObservation();
-    float GetReward();
-    std::string GetExtraInfo();
-    bool ExecuteActions(Ptr<OpenGymDataContainer> action);
+  Ptr<OpenGymSpace> GetActionSpace ();
+  Ptr<OpenGymSpace> GetObservationSpace ();
+  bool GetGameOver ();
+  Ptr<OpenGymDataContainer> GetObservation ();
+  float GetReward ();
+  std::string GetExtraInfo ();
+  bool ExecuteActions (Ptr<OpenGymDataContainer> action);
 
-    // the function has to be static to work with MakeBoundCallback
-    // that is why we pass pointer to MyGymEnv instance to be able to store the context (node, etc)
-    // static void NotifyPktRxEvent(Ptr<MyGymEnv> entity, Ptr<Node> node, Ptr<const Packet> packet); // for event-based env
-    static void CountRxPkts(Ptr<MyGymEnv> entity, Ptr<Node> node, Ptr<const Packet> packet);
-    static void SrcTxDone(Ptr<MyGymEnv> entity, Ptr<Node> node, uint32_t idx, const WifiMacHeader &hdr);
-    static void SrcTxFail(Ptr<MyGymEnv> entity, Ptr<Node> node, uint32_t idx, const WifiMacHeader &hdr);
+  // the function has to be static to work with MakeBoundCallback
+  // that is why we pass pointer to MyGymEnv instance to be able to store the context (node, etc)
+  // static void NotifyPktRxEvent(Ptr<MyGymEnv> entity, Ptr<Node> node, Ptr<const Packet> packet); // for event-based env
+  // NOTE: is node argument used?
+  // MYTODO cleanup
+  static void CountRxPkts (Ptr<MyGymEnv> entity, Ptr<Node> node, Ptr<const Packet> packet);
+  static void SrcTxDone (Ptr<MyGymEnv> entity, Ptr<Node> node, uint32_t idx,
+                         const WifiMacHeader &hdr);
+  static void SrcTxFail (Ptr<MyGymEnv> entity, Ptr<Node> node, uint32_t idx,
+                         const WifiMacHeader &hdr);
 
 private:
-    void ScheduleNextStateRead();
-    Ptr<WifiMacQueue> GetQueue(Ptr<Node> node);
-    bool SetCw(Ptr<Node> node, uint32_t cwMinValue=0, uint32_t cwMaxValue=0);
+  void ScheduleNextStateRead ();
+  Ptr<WifiMacQueue> GetQueue (Ptr<Node> node);
+  bool SetCw (Ptr<Node> node, uint32_t cwMinValue = 0, uint32_t cwMaxValue = 0);
 
-    NodeContainer m_agents;
-    std::vector<Ptr<MyGymNodeState> > m_agent_state;
+  NodeContainer m_agents;
+  std::vector<Ptr<MyGymNodeState>> m_agent_state;
 
-    std::vector<uint32_t> m_obs_shape;
-    Time m_interval = Seconds(0.1);
-    // Ptr<Node> m_currentNode;
-    uint64_t m_rxPktNum;
+  std::vector<uint32_t> m_obs_shape;
+  Time m_interval = Seconds (0.1);
+  // Ptr<Node> m_currentNode;
+  uint64_t m_rxPktNum;
 
-    bool m_enabled;
-    bool m_continuous;
-    // Ptr<DelayJitterEstimation> m_delay_estimator;
-
+  bool m_enabled;
+  bool m_continuous;
+  bool m_dynamicInterval;
+  // Ptr<DelayJitterEstimation> m_delay_estimator;
 };
 
-}
+} // namespace ns3
 
 #endif // MY_GYM_ENTITY_H

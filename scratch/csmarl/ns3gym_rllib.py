@@ -33,15 +33,22 @@ class Ns3EnvWrapper(gym.Env):
 
     def __init__(self, env_config):
         self._worker_index = env_config.worker_index
-        port = 5555 + self._worker_index
-        simTime = 20
-        stepTime = 0.1
+        # port = 5555 + self._worker_index
+        port = 0
+        simTime = env_config.get("simTime", 20)
+        stepTime = env_config.get("stepTime", 0.1)
         seed = 0
+        cwd = env_config.get("cwd", None)
+        continuous = env_config.get("continuous", False)
+
+        self.debug = env_config.get("debug", False)
+        self.dynamic_interval = env_config.get("dynamicInterval", True)
+
         simArgs = {"--simTime": simTime,
                    "--stepTime": stepTime,
-                   "--continuous": True}
-        cwd = env_config.get("cwd", None)
-        self.debug = env_config.get("debug", False)
+                   "--continuous": continuous,
+                   "--dynamicInterval": self.dynamic_interval}
+
         print("worker {} start".format(self._worker_index)) if self.debug else None
         self._env = ns3env.Ns3Env(port=port, stepTime=stepTime, startSim=True,
                                   simSeed=seed, simArgs=simArgs, debug=False, cwd=cwd)
@@ -80,11 +87,19 @@ if __name__ == "__main__":
             "env": Ns3EnvWrapper,
             # "vf_share_layers": True,
             "lr": 1e-4,
-            "num_workers": 8,
-            "env_config": {
-                "cwd": cwd,
-                "debug": False
-            },
+            "num_workers": 4,
+            "env_config": 
+                { "cwd": cwd,
+                  "debug": False,
+                  "stepTime": 0.02,
+                  "continuous": True},
+                # tune.grid_search([
+                #     { "cwd": cwd,
+                #       "debug": False,
+                #       "dynamicInterval": False},
+                #     { "cwd": cwd,
+                #       "debug": False,
+                #       "dynamicInterval": True}]),
             # "log_level": "DEBUG"
         }
     )

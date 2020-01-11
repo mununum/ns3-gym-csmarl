@@ -56,7 +56,7 @@ MyGymEnv::MyGymEnv ()
 }
 
 MyGymEnv::MyGymEnv (NodeContainer agents, Time stepTime, bool enabled = true,
-                    bool continuous = false, bool dynamicInterval = true)
+                    bool continuous = false, bool dynamicInterval = false)
 {
   NS_LOG_FUNCTION (this);
   // m_currentNode = 0;
@@ -287,6 +287,7 @@ MyGymEnv::GetObservation ()
 float
 MyGymEnv::GetReward ()
 {
+  // MYTODO: resolve rllib warning
   NS_LOG_FUNCTION (this);
   static float lastValue = 0.0;
   float reward = m_rxPktNum - lastValue;

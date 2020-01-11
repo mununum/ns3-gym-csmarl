@@ -35,7 +35,7 @@ main (int argc, char *argv[])
   // OpenGym Env
   bool opengymEnabled = true;
   bool continuous = false;
-  bool dynamicInterval = true;
+  bool dynamicInterval = false;
 
   // Parameters of the scenario
   uint32_t nodeNum = 2;
@@ -70,7 +70,7 @@ main (int argc, char *argv[])
   cmd.AddValue ("distance", "Inter node distance. Default: 10m", distance);
   cmd.AddValue ("opengymEnabled", "Using openAI gym or not. Default: true", opengymEnabled);
   cmd.AddValue ("continuous", "Use continuous action space. Default: false", continuous);
-  cmd.AddValue ("dynamicInterval", "Dynamically changing step interval. Default: true",
+  cmd.AddValue ("dynamicInterval", "Dynamically changing step interval. Default: false",
                 dynamicInterval);
   // cmd.AddValue ("testArg", "Extra simulation argument. Default: 0", testArg);
   cmd.Parse (argc, argv);
@@ -79,6 +79,7 @@ main (int argc, char *argv[])
   NS_LOG_UNCOND ("--simulationTime: " << simulationTime);
   NS_LOG_UNCOND ("--openGymPort: " << openGymPort);
   NS_LOG_UNCOND ("--envStepTime: " << envStepTime);
+  NS_LOG_UNCOND ("--dynamicInterval: " << dynamicInterval);
   NS_LOG_UNCOND ("--seed: " << simSeed);
   NS_LOG_UNCOND ("--distance: " << distance);
   // NS_LOG_UNCOND ("--testArg: " << testArg);

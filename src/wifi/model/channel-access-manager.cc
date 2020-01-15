@@ -287,9 +287,11 @@ ChannelAccessManager::RequestAccess (Ptr<Txop> state, bool isCfPeriod)
   // Mark the HOL packet tag
   {
     Ptr<WifiMacQueue> queue = state->GetWifiMacQueue ();
-    Ptr<const Packet> p = queue->Peek ()->GetPacket ();
-    if (p && !DelayJitterEstimation::IsMarked (p)) {
-      DelayJitterEstimation::PrepareTx (p);
+    if (!queue->IsEmpty ()) {
+      Ptr<const Packet> p = queue->Peek ()->GetPacket ();
+      if (p && !DelayJitterEstimation::IsMarked (p)) {
+        DelayJitterEstimation::PrepareTx (p);
+      }
     }
   }
 

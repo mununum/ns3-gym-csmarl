@@ -20,6 +20,8 @@ int
 main (int argc, char *argv[])
 {
 
+  // LogComponentEnable("MyGymEnv", LOG_LEVEL_DEBUG);
+
   // Parameters of the environment
   uint32_t simSeed = 1;
   double simulationTime = 10; // seconds

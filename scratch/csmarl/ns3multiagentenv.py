@@ -114,10 +114,13 @@ if __name__ == "__main__":
     #     act_space = single_env.action_space
 
     # temporary single environment for extracting single obs/act dim
-    # with ns3env.Ns3Env(port=0, startSim=True, simArgs={
-    #         "--nFlows": 1}, cwd=cwd) as single_env:
-    #     obs_space = single_env.observation_space
-    #     act_space = single_env.action_space
+    with ns3env.Ns3Env(port=0, startSim=True, simArgs={
+            "--nFlows": 1}, cwd=cwd) as single_env:
+        multi_obs_space = single_env.observation_space
+        multi_act_space = single_env.action_space
+        obs_space = gym.spaces.Box(
+            low=multi_obs_space.low[0], high=multi_obs_space.high[0], dtype=multi_obs_space.dtype)
+        act_space = multi_act_space.spaces[0]
 
     # print(obs_space)
     # print(act_space)
@@ -131,10 +134,10 @@ if __name__ == "__main__":
             # "log_level": "DEBUG",
             "lr": 1e-4,
             "num_workers": 1,
-            # "multiagent": {
-            #     "policies": {"default_policy": (None, obs_space, act_space, {})},
-            #     "policy_mapping_fn": lambda _: "default_policy"
-            # },
+            "multiagent": {
+                "policies": {"default_policy": (None, obs_space, act_space, {})},
+                "policy_mapping_fn": lambda _: "default_policy"
+            },
             "env_config": {
                 "cwd": cwd,
                 "my_conf": 42,

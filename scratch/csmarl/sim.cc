@@ -20,17 +20,11 @@ int
 main (int argc, char *argv[])
 {
 
-  // LogComponentEnable("Txop", LOG_LEVEL_DEBUG);
-  // LogComponentEnable("ArpL3Protocol", LOG_LEVEL_LOGIC);
-  // LogComponentEnable("OpenGymInterface", LOG_LEVEL_DEBUG);
-  // LogComponentEnable("ChannelAccessManager", LOG_LEVEL_DEBUG);
-
   // Parameters of the environment
   uint32_t simSeed = 1;
   double simulationTime = 10; // seconds
   double envStepTime = 0.1; // seconds, ns3gym env step time interval
   uint32_t openGymPort = 5555;
-  // uint32_t testArg = 0;
 
   // OpenGym Env
   bool opengymEnabled = true;
@@ -38,13 +32,13 @@ main (int argc, char *argv[])
   bool dynamicInterval = false;
 
   // Parameters of the scenario
-  uint32_t nodeNum = 2;
+  uint32_t nFlows = 1;
   double distance = 10.0;
   bool noErrors = false;
   std::string errorModelType = "ns3::NistErrorRateModel";
-  bool enableFading = true;
+  // bool enableFading = true;
   uint32_t pktPerSec = 1000;
-  uint32_t payloadSize = 1500;
+  uint32_t payloadSize = 1500; // 1500 B/pkt * 8 b/B * 1000 pkt/s = 12.0 Mbps
   bool enabledMinstrel = false;
 
   // define datarates
@@ -54,7 +48,7 @@ main (int argc, char *argv[])
   dataRates.push_back ("OfdmRate3MbpsBW5MHz");
   dataRates.push_back ("OfdmRate4_5MbpsBW5MHz");
   dataRates.push_back ("OfdmRate6MbpsBW5MHz");
-  dataRates.push_back ("OfdmRate9MbpsBW5MHz");
+  dataRates.push_back ("OfdmRate9MbpsBW5MHz"); // <--
   dataRates.push_back ("OfdmRate12MbpsBW5MHz");
   dataRates.push_back ("OfdmRate13_5MbpsBW5MHz");
   uint32_t dataRateId = 5;
@@ -66,13 +60,12 @@ main (int argc, char *argv[])
   // optional parameters
   cmd.AddValue ("simTime", "Simulation time in seconds, Default: 10s", simulationTime);
   cmd.AddValue ("stepTime", "Step time of the environment, Default: 0.1s", envStepTime);
-  cmd.AddValue ("nodeNum", "Number of nodes. Default: 2", nodeNum);
+  cmd.AddValue ("nFlows", "Number of flows. Default: 1", nFlows);
   cmd.AddValue ("distance", "Inter node distance. Default: 10m", distance);
   cmd.AddValue ("opengymEnabled", "Using openAI gym or not. Default: true", opengymEnabled);
   cmd.AddValue ("continuous", "Use continuous action space. Default: false", continuous);
   cmd.AddValue ("dynamicInterval", "Dynamically changing step interval. Default: false",
                 dynamicInterval);
-  // cmd.AddValue ("testArg", "Extra simulation argument. Default: 0", testArg);
   cmd.Parse (argc, argv);
 
   NS_LOG_UNCOND ("Ns3Env parameters:");
@@ -82,7 +75,6 @@ main (int argc, char *argv[])
   NS_LOG_UNCOND ("--dynamicInterval: " << dynamicInterval);
   NS_LOG_UNCOND ("--seed: " << simSeed);
   NS_LOG_UNCOND ("--distance: " << distance);
-  // NS_LOG_UNCOND ("--testArg: " << testArg);
 
   if (noErrors)
     {
@@ -94,12 +86,32 @@ main (int argc, char *argv[])
 
   // Configuration of the scenario
   // Create Nodes
+  uint32_t nodeNum = nFlows * 2;
   NodeContainer nodes;
   nodes.Create (nodeNum);
 
   // WiFi device
   WifiHelper wifi;
   wifi.SetStandard (WIFI_PHY_STANDARD_80211_5MHZ);
+
+  // Mobility model
+  MobilityHelper mobility;
+  // mobility.SetPositionAllocator ("ns3::GridPositionAllocator", "MinX", DoubleValue (0.0), "MinY",
+  //                                DoubleValue (0.0), "DeltaX", DoubleValue (distance), "DeltaY",
+  //                                DoubleValue (distance), "GridWidth",
+  //                                UintegerValue (2), // will create FIM topology
+  //                                "LayoutType", StringValue ("RowFirst"));
+  Ptr<ListPositionAllocator> positionAlloc = CreateObject<ListPositionAllocator> ();
+  for (uint32_t i = 0; i < nFlows; i++)
+    {
+      // The nodes will be overlapped
+      positionAlloc->Add (Vector (0.0, 0.0, 0.0));
+      positionAlloc->Add (Vector (5.0, 0.0, 0.0));
+    }
+  mobility.SetPositionAllocator (positionAlloc);
+
+  mobility.SetMobilityModel ("ns3::ConstantPositionMobilityModel");
+  mobility.Install (nodes);
 
   // Channel
   SpectrumWifiPhyHelper spectrumPhy = SpectrumWifiPhyHelper::Default ();
@@ -116,13 +128,35 @@ main (int argc, char *argv[])
   Config::SetDefault ("ns3::WifiPhy::ChannelWidth", UintegerValue (5));
 
   // Channel
-  Ptr<FriisPropagationLossModel> lossModel = CreateObject<FriisPropagationLossModel> ();
-  Ptr<NakagamiPropagationLossModel> fadingModel = CreateObject<NakagamiPropagationLossModel> ();
-  if (enableFading)
+  // Ptr<FriisPropagationLossModel> lossModel = CreateObject<FriisPropagationLossModel> ();
+  // Ptr<NakagamiPropagationLossModel> fadingModel = CreateObject<NakagamiPropagationLossModel> ();
+  // if (enableFading)
+  //   {
+  //     lossModel->SetNext (fadingModel);
+  //   }
+  // spectrumChannel->AddPropagationLossModel (lossModel);
+  Ptr<MatrixPropagationLossModel> lossModel = CreateObject<MatrixPropagationLossModel> ();
+  // Example: For nodes 0, 1, 2, 3, 4, 5,
+  // 0 -- 1, 2 -- 3, 4 -- 5 will be pairs
+  Ptr<MobilityModel> mobilityS = nodes.Get (0)->GetObject<MobilityModel> ();
+  Ptr<MobilityModel> mobilityR = nodes.Get (1)->GetObject<MobilityModel> ();
+  for (uint32_t i = 2; i < nodeNum; i++)
     {
-      lossModel->SetNext (fadingModel);
+      Ptr<MobilityModel> mobility = nodes.Get (i)->GetObject<MobilityModel> ();
+
+      lossModel->SetLoss (mobilityS, mobility, 0);
+      lossModel->SetLoss (mobilityR, mobility, 0);
+    }
+  for (uint32_t srcNodeId = 0; srcNodeId < nodeNum; srcNodeId += 2)
+    {
+      uint32_t dstNodeId = srcNodeId + 1;
+      mobilityS = nodes.Get (srcNodeId)->GetObject<MobilityModel> ();
+      mobilityR = nodes.Get (dstNodeId)->GetObject<MobilityModel> ();
+
+      lossModel->SetLoss (mobilityS, mobilityR, 0);
     }
   spectrumChannel->AddPropagationLossModel (lossModel);
+
   Ptr<ConstantSpeedPropagationDelayModel> delayModel =
       CreateObject<ConstantSpeedPropagationDelayModel> ();
   spectrumChannel->SetPropagationDelayModel (delayModel);
@@ -149,16 +183,6 @@ main (int argc, char *argv[])
   // Install wifi device
   NetDeviceContainer devices = wifi.Install (spectrumPhy, wifiMac, nodes);
 
-  // Mobility model
-  MobilityHelper mobility;
-  mobility.SetPositionAllocator ("ns3::GridPositionAllocator", "MinX", DoubleValue (0.0), "MinY",
-                                 DoubleValue (0.0), "DeltaX", DoubleValue (distance), "DeltaY",
-                                 DoubleValue (distance), "GridWidth",
-                                 UintegerValue (nodeNum), // will create linear topology
-                                 "LayoutType", StringValue ("RowFirst"));
-  mobility.SetMobilityModel ("ns3::ConstantPositionMobilityModel");
-  mobility.Install (nodes);
-
   // IP stack and routing
   InternetStackHelper internet;
   internet.Install (nodes);
@@ -177,33 +201,45 @@ main (int argc, char *argv[])
   // startTimeRng->SetAttribute ("Min", DoubleValue (0.0));
   // startTimeRng->SetAttribute ("Max", DoubleValue (1.0));
 
-  // Send a UDP trafic from 0 --> 1
+  // Send a UDP trafic from even --> odd
 
   uint16_t port = 1000;
-  uint32_t srcNodeId = 0;
-  uint32_t destNodeId = 1;
-  Ptr<Node> srcNode = nodes.Get (srcNodeId);
-  Ptr<Node> dstNode = nodes.Get (destNodeId);
+  // uint32_t srcNodeId = 0;
+  // uint32_t destNodeId = 1;
+  NodeContainer agents;
+  ApplicationContainer sourceApps;
+  ApplicationContainer sinkApps;
+  for (uint32_t srcNodeId = 0; srcNodeId < nodeNum; srcNodeId += 2)
+    {
+      uint32_t destNodeId = srcNodeId + 1;
+      Ptr<Node> srcNode = nodes.Get (srcNodeId);
+      Ptr<Node> dstNode = nodes.Get (destNodeId);
 
-  Ptr<Ipv4> destIpv4 = dstNode->GetObject<Ipv4> ();
-  Ipv4InterfaceAddress dest_ipv4_int_addr = destIpv4->GetAddress (1, 0);
-  Ipv4Address dest_ip_addr = dest_ipv4_int_addr.GetLocal ();
+      agents.Add (srcNode);
 
-  InetSocketAddress destAddress (dest_ip_addr, port);
-  destAddress.SetTos (0x70); // AC_BE
-  UdpClientHelper source (destAddress);
-  source.SetAttribute ("MaxPackets", UintegerValue (pktPerSec * simulationTime));
-  source.SetAttribute ("PacketSize", UintegerValue (payloadSize));
-  Time interPacketInterval = Seconds (1.0 / pktPerSec);
-  source.SetAttribute ("Interval", TimeValue (interPacketInterval)); // packets/s
+      Ptr<Ipv4> destIpv4 = dstNode->GetObject<Ipv4> ();
+      Ipv4InterfaceAddress dest_ipv4_int_addr = destIpv4->GetAddress (1, 0);
+      Ipv4Address dest_ip_addr = dest_ipv4_int_addr.GetLocal ();
 
-  ApplicationContainer sourceApps = source.Install (srcNode);
+      InetSocketAddress destAddress (dest_ip_addr, port);
+      destAddress.SetTos (0x70); // AC_BE
+      UdpClientHelper source (destAddress);
+      source.SetAttribute ("MaxPackets", UintegerValue (pktPerSec * simulationTime));
+      source.SetAttribute ("PacketSize", UintegerValue (payloadSize));
+      Time interPacketInterval = Seconds (1.0 / pktPerSec);
+      source.SetAttribute ("Interval", TimeValue (interPacketInterval)); // packets/s
+
+      ApplicationContainer newSourceApps = source.Install (srcNode);
+      sourceApps.Add (newSourceApps);
+
+      // Create a packet sink to receive these packets
+      UdpServerHelper sink (port);
+      ApplicationContainer newSinkApps = sink.Install (dstNode);
+      sinkApps.Add (newSinkApps);
+    }
+
   sourceApps.Start (Seconds (0.0));
   sourceApps.Stop (Seconds (simulationTime));
-
-  // Create a packet sink to receive these packets
-  UdpServerHelper sink (port);
-  ApplicationContainer sinkApps = sink.Install (dstNode);
   sinkApps.Start (Seconds (0.0));
   sinkApps.Stop (Seconds (simulationTime));
 
@@ -218,24 +254,27 @@ main (int argc, char *argv[])
     }
 
   // Ptr<NodeContainer> agents = CreateObject<NodeContainer> ();
-  NodeContainer agents;
-  agents.Add (srcNode);
 
+  // Configure OpenGym environment
   Ptr<OpenGymInterface> openGymInterface = CreateObject<OpenGymInterface> (openGymPort);
-  Ptr<MyGymEnv> myGymEnv =
-      CreateObject<MyGymEnv> (agents, Seconds (envStepTime), opengymEnabled, continuous, dynamicInterval);
+  Ptr<MyGymEnv> myGymEnv = CreateObject<MyGymEnv> (agents, Seconds (envStepTime), opengymEnabled,
+                                                   continuous, dynamicInterval);
 
   myGymEnv->SetOpenGymInterface (openGymInterface);
 
   // connect OpenGym entity to RX event source
-  Ptr<UdpServer> udpServer = DynamicCast<UdpServer> (sinkApps.Get (0));
+
+  for (uint32_t i = 0; i < nFlows; i++)
+    {
+      Ptr<UdpServer> udpServer = DynamicCast<UdpServer> (sinkApps.Get (i));
+      Ptr<Node> dstNode = nodes.Get (i * 2 + 1);
+      udpServer->TraceConnectWithoutContext (
+          "Rx", MakeBoundCallback (&MyGymEnv::CountRxPkts, myGymEnv, dstNode, i));
+    }
   // udpServer->TraceConnectWithoutContext ("Rx", MakeCallback (&DestRxPkt));
-  udpServer->TraceConnectWithoutContext (
-      "Rx", MakeBoundCallback (&MyGymEnv::CountRxPkts, myGymEnv, dstNode));
 
   // connect TxOkHeader trace source
-  uint32_t numAgents = agents.GetN ();
-  for (uint32_t i = 0; i < numAgents; i++)
+  for (uint32_t i = 0; i < nFlows; i++)
     {
       Ptr<Node> node = agents.Get (i);
       Ptr<NetDevice> dev = node->GetDevice (0);

@@ -23,6 +23,8 @@ public:
   MyGymNodeState ()
       : m_txPktBytes (0),
         m_txPktCount (0),
+        m_rxPktNum (0),
+        m_rxPktNumLastVal (0),
         m_delaySum (Seconds (0.0)),
         m_delay_estimator (CreateObject<DelayJitterEstimation> ())
   {
@@ -39,17 +41,14 @@ public:
 private:
   uint64_t m_txPktBytes;
   uint64_t m_txPktCount;
+
+  uint64_t m_rxPktNum;
+  uint64_t m_rxPktNumLastVal;
+
   Time m_delaySum;
   Ptr<DelayJitterEstimation> m_delay_estimator;
 };
 
-// for event-based env
-// MyGymEnv::MyGymEnv ()
-// {
-//     NS_LOG_FUNCTION (this);
-//     m_currentNode = 0;
-//     m_rxPktNum = 0;
-// }
 MyGymEnv::MyGymEnv ()
 {
   NS_LOG_FUNCTION (this);
@@ -59,8 +58,6 @@ MyGymEnv::MyGymEnv (NodeContainer agents, Time stepTime, bool enabled = true,
                     bool continuous = false, bool dynamicInterval = false)
 {
   NS_LOG_FUNCTION (this);
-  // m_currentNode = 0;
-  m_rxPktNum = 0;
   m_agents = agents;
   m_interval = stepTime;
   m_enabled = enabled;
@@ -75,12 +72,6 @@ MyGymEnv::MyGymEnv (NodeContainer agents, Time stepTime, bool enabled = true,
       m_agent_state.push_back (CreateObject<MyGymNodeState> ());
     }
 
-  // make initial configuration for testing
-  // for (uint32_t i=0; i<numAgents; i++) {
-  //     Ptr<Node> node = m_agents.Get (i);
-  //     SetCw(node, 256, 256);
-  // }
-
   Simulator::Schedule (Seconds (0.0), &MyGymEnv::ScheduleNextStateRead, this);
 }
 
@@ -94,9 +85,10 @@ MyGymEnv::ScheduleNextStateRead ()
     Notify ();
   else
     {
-      GetReward ();
       GetGameOver ();
       GetObservation ();
+      GetReward ();
+      GetExtraInfo ();
     }
 
   Simulator::Schedule (m_interval, &MyGymEnv::ScheduleNextStateRead, this);
@@ -166,9 +158,9 @@ Ptr<OpenGymSpace>
 MyGymEnv::GetObservationSpace ()
 {
   NS_LOG_FUNCTION (this);
-  uint32_t nodeNum = m_agents.GetN ();
-  uint32_t perNodeObsDim = 4; // Throughput, Latency, Loss%, CW
-  m_obs_shape = {nodeNum, perNodeObsDim};
+  uint32_t agentNum = m_agents.GetN ();
+  uint32_t perAgentObsDim = 4; // Throughput, Latency, Loss%, CW
+  m_obs_shape = {agentNum, perAgentObsDim};
 
   float low = 0.0;
   float high = 2000.0;
@@ -289,9 +281,11 @@ MyGymEnv::GetReward ()
 {
   // MYTODO: resolve rllib warning
   NS_LOG_FUNCTION (this);
-  static float lastValue = 0.0;
-  float reward = m_rxPktNum - lastValue;
-  lastValue = m_rxPktNum;
+  float reward = 0.0;
+  for (uint32_t i = 0; i < m_agents.GetN (); i++)
+    {
+      reward += m_agent_state[i]->m_rxPktNum - m_agent_state[i]->m_rxPktNumLastVal;
+    }
   NS_LOG_DEBUG ("MyGetReward: " << reward);
   return reward;
 }
@@ -300,12 +294,18 @@ std::string
 MyGymEnv::GetExtraInfo ()
 {
   NS_LOG_FUNCTION (this);
-  std::string myInfo = "MyInfo=0";
-  // myInfo += "=";
-  // if (m_currentNode) {
-  //     myInfo += std::to_string(m_currentNode->GetId());
-  // }
-  // NS_LOG_UNCOND("MyGetExtraInfo: " << myInfo);
+  std::string myInfo = "";
+
+  for (uint32_t i = 0; i < m_agents.GetN (); i++)
+    {
+      myInfo += std::to_string (i);
+      myInfo += "=";
+      myInfo += std::to_string (m_agent_state[i]->m_rxPktNum - m_agent_state[i]->m_rxPktNumLastVal);
+      m_agent_state[i]->m_rxPktNumLastVal = m_agent_state[i]->m_rxPktNum;
+      myInfo += " ";
+    }
+
+  NS_LOG_DEBUG ("MyGetExtraInfo: " << myInfo);
   return myInfo;
 }
 
@@ -402,17 +402,6 @@ MyGymEnv::ExecuteActions (Ptr<OpenGymDataContainer> action)
           SetCw (node, cwSize, cwSize);
         }
 
-      // Ptr<OpenGymBoxContainer<int32_t>> box = DynamicCast<OpenGymBoxContainer<int32_t>>(action);
-      // std::vector<int32_t> actionVector = box->GetData();
-
-      // for (uint32_t i=0; i<agentNum; i++) {
-      //     Ptr<Node> node = m_agents.Get (i);
-
-      //     int32_t exponent = actionVector.at(i) + 1;
-      //     // CW range: 2^1-1 ~ 2^10-1
-      //     uint32_t cwSize = std::pow(2, exponent) - 1;
-      //     SetCw(node, cwSize, cwSize);
-      // }
     }
 
   return true;
@@ -433,11 +422,12 @@ MyGymEnv::ExecuteActions (Ptr<OpenGymDataContainer> action)
 
 // This method is called upon RX
 void
-MyGymEnv::CountRxPkts (Ptr<MyGymEnv> entity, Ptr<Node> node, Ptr<const Packet> packet)
+MyGymEnv::CountRxPkts (Ptr<MyGymEnv> entity, Ptr<Node> node, uint32_t idx, Ptr<const Packet> packet)
 {
-  NS_LOG_DEBUG ("Client received a packet of " << packet->GetSize () << " bytes");
+  // NS_LOG_DEBUG ("Client received a packet of " << packet->GetSize () << " bytes");
   // entity->m_currentNode = node;
-  entity->m_rxPktNum++;
+  entity->m_agent_state[idx]->m_rxPktNum++;
+  // entity->m_rxPktNum++;
 
   // entity->m_delay_estimator->RecordRx (packet);
 

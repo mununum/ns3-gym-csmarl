@@ -18,7 +18,8 @@ class MyGymEnv : public OpenGymEnv
 {
 public:
   MyGymEnv (); // for typeid registration
-  MyGymEnv (NodeContainer agents, Time stepTime, bool enabled, bool continuous, bool dynamicInterval);
+  MyGymEnv (NodeContainer agents, Time stepTime, bool enabled, bool continuous,
+            bool dynamicInterval);
 
   virtual ~MyGymEnv ();
   static TypeId GetTypeId (void);
@@ -37,7 +38,8 @@ public:
   // static void NotifyPktRxEvent(Ptr<MyGymEnv> entity, Ptr<Node> node, Ptr<const Packet> packet); // for event-based env
   // NOTE: is node argument used?
   // MYTODO cleanup
-  static void CountRxPkts (Ptr<MyGymEnv> entity, Ptr<Node> node, Ptr<const Packet> packet);
+  static void CountRxPkts (Ptr<MyGymEnv> entity, Ptr<Node> node, uint32_t idx,
+                           Ptr<const Packet> packet);
   static void SrcTxDone (Ptr<MyGymEnv> entity, Ptr<Node> node, uint32_t idx,
                          const WifiMacHeader &hdr);
   static void SrcTxFail (Ptr<MyGymEnv> entity, Ptr<Node> node, uint32_t idx,
@@ -53,13 +55,10 @@ private:
 
   std::vector<uint32_t> m_obs_shape;
   Time m_interval = Seconds (0.1);
-  // Ptr<Node> m_currentNode;
-  uint64_t m_rxPktNum;
 
   bool m_enabled;
   bool m_continuous;
   bool m_dynamicInterval;
-  // Ptr<DelayJitterEstimation> m_delay_estimator;
 };
 
 } // namespace ns3

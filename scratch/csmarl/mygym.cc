@@ -163,7 +163,7 @@ MyGymEnv::GetObservationSpace ()
   m_obs_shape = {agentNum, perAgentObsDim};
 
   float low = 0.0;
-  float high = 2000.0;
+  float high = 10000.0;
 
   // std::vector<uint32_t> shape = {nodeNum,};
   std::string dtype = TypeNameGet<float> ();
@@ -279,7 +279,6 @@ MyGymEnv::GetObservation ()
 float
 MyGymEnv::GetReward ()
 {
-  // MYTODO: resolve rllib warning
   NS_LOG_FUNCTION (this);
   float reward = 0.0;
   for (uint32_t i = 0; i < m_agents.GetN (); i++)
@@ -287,7 +286,7 @@ MyGymEnv::GetReward ()
       reward += m_agent_state[i]->m_rxPktNum - m_agent_state[i]->m_rxPktNumLastVal;
     }
   NS_LOG_DEBUG ("MyGetReward: " << reward);
-  return reward;
+  return reward / 1000.0;
 }
 
 std::string
@@ -300,7 +299,7 @@ MyGymEnv::GetExtraInfo ()
     {
       myInfo += std::to_string (i);
       myInfo += "=";
-      myInfo += std::to_string (m_agent_state[i]->m_rxPktNum - m_agent_state[i]->m_rxPktNumLastVal);
+      myInfo += std::to_string ((float)(m_agent_state[i]->m_rxPktNum - m_agent_state[i]->m_rxPktNumLastVal) / 1000.0);
       m_agent_state[i]->m_rxPktNumLastVal = m_agent_state[i]->m_rxPktNum;
       myInfo += " ";
     }

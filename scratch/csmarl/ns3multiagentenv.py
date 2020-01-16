@@ -57,14 +57,17 @@ class Ns3MultiAgentEnv(MultiAgentEnv):
         seed = 0
         cwd = env_config.get("cwd", None)
 
-        self._debug = env_config.get("debug", False)
+        self.debug = env_config.get("debug", False)
 
         simArgs = {"--simTime": simTime,
                    "--stepTime": stepTime,
-                   "--nFlows": self.n_agents}
+                   "--nFlows": self.n_agents,
+                   "--debug": self.debug}
+
+        print("worker {} start".format(self.worker_index))
 
         self._env = ns3env.Ns3Env(port=port, stepTime=stepTime, startSim=True,
-                                  simSeed=seed, simArgs=simArgs, debug=self._debug, cwd=cwd)
+                                  simSeed=seed, simArgs=simArgs, debug=self.debug, cwd=cwd)
 
         self.multi_obs_space = self._env.observation_space
         self.multi_act_space = self._env.action_space
@@ -82,6 +85,7 @@ class Ns3MultiAgentEnv(MultiAgentEnv):
                      for kv in info.split()])
 
     def reset(self):
+        print("worker {} reset".format(self.worker_index))
         obs = self._env.reset()
         return self.obs_to_dict(obs)
 
@@ -95,6 +99,7 @@ class Ns3MultiAgentEnv(MultiAgentEnv):
         return obs, rew, done, info
 
     def close(self):
+        print("worker {} close".format(self.worker_index))
         self._env.close()
 
 

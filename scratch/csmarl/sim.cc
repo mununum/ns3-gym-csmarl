@@ -20,13 +20,12 @@ int
 main (int argc, char *argv[])
 {
 
-  // LogComponentEnable("MyGymEnv", LOG_LEVEL_DEBUG);
-
   // Parameters of the environment
   uint32_t simSeed = 1;
   double simulationTime = 10; // seconds
   double envStepTime = 0.1; // seconds, ns3gym env step time interval
   uint32_t openGymPort = 5555;
+  bool debug = false;
 
   // OpenGym Env
   bool opengymEnabled = true;
@@ -68,6 +67,7 @@ main (int argc, char *argv[])
   cmd.AddValue ("continuous", "Use continuous action space. Default: false", continuous);
   cmd.AddValue ("dynamicInterval", "Dynamically changing step interval. Default: false",
                 dynamicInterval);
+  cmd.AddValue ("debug", "Print debug message. Default: false", debug);
   cmd.Parse (argc, argv);
 
   NS_LOG_UNCOND ("Ns3Env parameters:");
@@ -77,6 +77,12 @@ main (int argc, char *argv[])
   NS_LOG_UNCOND ("--dynamicInterval: " << dynamicInterval);
   NS_LOG_UNCOND ("--seed: " << simSeed);
   NS_LOG_UNCOND ("--distance: " << distance);
+
+  if (debug)
+    {
+      LogComponentEnable ("MyGymEnv", LOG_LEVEL_DEBUG);
+      LogComponentEnable ("OpenGymInterface", LOG_LEVEL_DEBUG);
+    }
 
   if (noErrors)
     {

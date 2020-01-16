@@ -230,7 +230,7 @@ MyGymEnv::GetObservation ()
         {
           lat = 0;
         }
-      lat /= 100000;
+      lat /= 1e9; // latency unit: sec
 
       delaySum += m_agent_state[i]->m_delaySum;
       pktSum += m_agent_state[i]->m_txPktCount;

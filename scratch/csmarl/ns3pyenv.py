@@ -6,7 +6,6 @@ from ns3gym import ns3env
 class Ns3PyEnv(py_environment.PyEnvironment):
 
     def __init__(self):
-        # MYTODO make this into attribute
         port = 5555
         simTime = 20
         stepTime = 0.1

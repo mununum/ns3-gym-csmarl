@@ -98,6 +98,17 @@ class Ns3MultiAgentEnv(MultiAgentEnv):
         self._env.close()
 
 
+def on_episode_step(info):
+    episode = info["episode"]
+
+
+def on_episode_end(info):
+    episode = info["episode"]
+    print(episode.agent_rewards)
+    for (agent_id, policy), reward in episode.agent_rewards.items():
+        episode.custom_metrics["agent_"+str(agent_id)] = reward
+
+
 if __name__ == "__main__":
 
     # register_env("dummy_multiagent_env",
@@ -141,6 +152,11 @@ if __name__ == "__main__":
             "env_config": {
                 "cwd": cwd,
                 "my_conf": 42,
+                "debug": False
+            },
+            "callbacks": {
+                # "on_episode_step": on_episode_step,
+                "on_episode_end": on_episode_end
             }
         }
     )

@@ -48,9 +48,9 @@ from ns3gym import ns3env
 
 class Ns3MultiAgentEnv(MultiAgentEnv):
 
-    def __init__(self, num, env_config):
+    def __init__(self, env_config):
         self.worker_index = env_config.worker_index
-        self.n_agents = num
+        self.n_agents = env_config.get("n_agents", 3)
         port = 0
         simTime = env_config.get("simTime", 20)
         stepTime = env_config.get("stepTime", 0.02)
@@ -105,6 +105,7 @@ class Ns3MultiAgentEnv(MultiAgentEnv):
 
 def on_episode_step(info):
     episode = info["episode"]
+    # print(episode.agent_rewards)
 
 
 def on_episode_end(info):
@@ -119,10 +120,7 @@ if __name__ == "__main__":
     # register_env("dummy_multiagent_env",
     #              lambda env_config: DummyMultiAgentEnv(3, env_config))
 
-    register_env("ns3_multiagent_env",
-                 lambda env_config: Ns3MultiAgentEnv(3, env_config))
-
-    ray.init()
+    ray.init(log_to_driver=False)
     cwd = os.path.dirname(os.path.abspath(__file__))
 
     # with DummyEnv(None) as single_env:
@@ -144,23 +142,31 @@ if __name__ == "__main__":
 
     tune.run(
         "PPO",
-        stop={"training_iteration": 100},
+        stop={"training_iteration": 3000},
         config={
-            "env": "ns3_multiagent_env",
-            # "log_level": "DEBUG",
+            # "env": "ns3_multiagent_env",
+            "env": Ns3MultiAgentEnv,
+            "batch_mode": "complete_episodes",
+            "log_level": "DEBUG",
             "lr": 1e-4,
-            "num_workers": 1,
+            "num_workers": 0,
             "multiagent": {
-                "policies": {"default_policy": (None, obs_space, act_space, {})},
-                "policy_mapping_fn": lambda _: "default_policy"
+                "policies": {
+                    "policy_0": (None, obs_space, act_space, {}),
+                    # "policy_1": (None, obs_space, act_space, {}),
+                    # "policy_2": (None, obs_space, act_space, {})
+                },
+                # "policy_mapping_fn": lambda i: "policy_"+str(i)
+                "policy_mapping_fn": lambda _: "policy_0"
             },
             "env_config": {
+                "n_agents": 3,
                 "cwd": cwd,
                 "my_conf": 42,
-                "debug": False
+                "debug": True
             },
             "callbacks": {
-                # "on_episode_step": on_episode_step,
+                "on_episode_step": on_episode_step,
                 "on_episode_end": on_episode_end
             }
         }

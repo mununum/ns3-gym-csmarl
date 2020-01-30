@@ -81,8 +81,12 @@ class Ns3MultiAgentEnv(MultiAgentEnv):
         return {i: multi_obs[i] for i in range(self.n_agents)}
 
     def info_to_rew(self, info):
-        return dict([(int(kv.split('=')[0]), float(kv.split('=')[1]))
-                     for kv in info.split()])
+        return {int(kv.split('=')[0]): float(kv.split('=')[1])
+                for kv in info.split()}
+
+    def parse_info(self, info):
+        return {int(kv.split('=')[0]): {"r_ind": float(kv.split('=')[1])}
+                for kv in info.split()}
 
     def reset(self):
         print("worker {} reset".format(self.worker_index))
@@ -91,11 +95,12 @@ class Ns3MultiAgentEnv(MultiAgentEnv):
 
     def step(self, action_dict):
         action = [action_dict[i] for i in range(self.n_agents)]
-        o, _, d, i = self._env.step(action)
+        o, r, d, i = self._env.step(action)
         obs = self.obs_to_dict(o)
-        rew = self.info_to_rew(i)
+        # rew = self.info_to_rew(i) # individual rewards
+        rew = {i: r for i in range(self.n_agents)}  # shared rewards
         done = {"__all__": d}
-        info = {}
+        info = self.parse_info(i)
         return obs, rew, done, info
 
     def close(self):
@@ -103,16 +108,28 @@ class Ns3MultiAgentEnv(MultiAgentEnv):
         self._env.close()
 
 
+def on_episode_start(info):
+    episode = info["episode"]
+    n_agents = info["env"].envs[0].n_agents
+    for i in range(n_agents):
+        episode.user_data["r_ind_"+str(i)] = []
+
+
 def on_episode_step(info):
     episode = info["episode"]
-    # print(episode.agent_rewards)
+    n_agents = info["env"].envs[0].n_agents
+    for i in range(n_agents):
+        if "r_ind" in episode.last_info_for(i):
+            episode.user_data["r_ind_"+str(i)].append(
+                episode.last_info_for(i)["r_ind"]
+            )
 
 
 def on_episode_end(info):
     episode = info["episode"]
-    print(episode.agent_rewards)
-    for (agent_id, policy), reward in episode.agent_rewards.items():
-        episode.custom_metrics["agent_"+str(agent_id)] = reward
+    r_ind_sum = {k: np.sum(v) for k, v in episode.user_data.items()}
+    for k, v in r_ind_sum.items():
+        episode.custom_metrics[k] = v
 
 
 if __name__ == "__main__":
@@ -166,6 +183,7 @@ if __name__ == "__main__":
                 "debug": True
             },
             "callbacks": {
+                "on_episode_start": on_episode_start,
                 "on_episode_step": on_episode_step,
                 "on_episode_end": on_episode_end
             }

@@ -18,17 +18,12 @@ from ray.rllib.utils.explained_variance import explained_variance
 from ray.rllib.utils.tf_ops import make_tf_callable
 from ray.rllib.utils import try_import_tf
 
-from ns3multiagentenv import Ns3MultiAgentEnv, on_episode_end
+from ns3multiagentenv import Ns3MultiAgentEnv, on_episode_start, on_episode_step, on_episode_end
 
 tf = try_import_tf()
 
 OTHER_OBS = "other_obs"
 OTHER_ACTION = "other_action"
-
-parser = argparse.ArgumentParser()
-parser.add_argument("--stop", type=int, default=1000000)
-parser.add_argument("--num_workers", type=int, default=0)
-
 
 class CentralizedCriticModel(TFModelV2):
     """Multi-agent model that implements a centralized VF."""
@@ -125,7 +120,6 @@ def centralized_critic_postprocessing(policy,
         # print([b[SampleBatch.ACTIONS].shape for b in other_batches])
         # print(sample_batch[OTHER_OBS].shape)
         # print(sample_batch[OTHER_ACTION].shape)
-        # print("agent_id:", sample_batch[SampleBatch.AGENT_INDEX])
 
         # overwrite default VF prediction with the central VF
         sample_batch[SampleBatch.VF_PREDS] = policy.compute_central_vf(
@@ -245,10 +239,17 @@ CCPPO = PPOTFPolicy.with_updates(
 CCTrainer = PPOTrainer.with_updates(name="CCPPOTrainer", default_policy=CCPPO)
 
 if __name__ == "__main__":
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--stop", help="number of timesteps, default 1e8", type=int, default=1e8)
+    parser.add_argument("--debug", help="debug indicator, default false", type=bool, default=False)
+
     args = parser.parse_args()
 
-    ray.init(log_to_driver=False)
-    # ray.init()
+    if args.debug:
+        ray.init()
+    else:
+        ray.init(log_to_driver=False)
 
     cwd = os.path.dirname(os.path.abspath(__file__))
 
@@ -265,9 +266,9 @@ if __name__ == "__main__":
             "env_config": {
                 "n_agents": 3,  # environment configuration
                 "cwd": cwd,
-                "debug": True
+                "debug": not args.debug
             },
-            "num_workers": 16,
+            "num_workers": 0 if args.debug else 16,
             "model": {
                 "custom_model": "cc_model",
                 "custom_options": {
@@ -275,6 +276,8 @@ if __name__ == "__main__":
                 }
             },
             "callbacks": {
+                "on_episode_start": on_episode_start,
+                "on_episode_step": on_episode_step,
                 "on_episode_end": on_episode_end
             }
         }

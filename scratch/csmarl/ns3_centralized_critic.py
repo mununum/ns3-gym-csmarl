@@ -103,7 +103,8 @@ def centralized_critic_postprocessing(policy,
     if policy.loss_initialized():
         assert sample_batch["dones"][-1], "Not implemented for train_batch_mode=truncate_episodes"
         assert other_agent_batches is not None
-        other_batches = [other_batch for _, other_batch in other_agent_batches.values()]
+        other_batches = [other_batch for _,
+                         other_batch in other_agent_batches.values()]
         # [(_, other_batch)] = list(other_agent_batches.values())
 
         # also record the opponent obs and actions in the trajectory
@@ -113,8 +114,10 @@ def centralized_critic_postprocessing(policy,
         # NOTE shape of batches
         # b[SampleBatch.CUR_OBS] = (T, 4)
         # b[SampleBatch.ACTIONS] = (T,)
-        sample_batch[OTHER_OBS] = np.concatenate([b[SampleBatch.CUR_OBS] for b in other_batches], axis=-1)
-        sample_batch[OTHER_ACTION] = np.stack([b[SampleBatch.ACTIONS] for b in other_batches], axis=-1)
+        sample_batch[OTHER_OBS] = np.concatenate(
+            [b[SampleBatch.CUR_OBS] for b in other_batches], axis=-1)
+        sample_batch[OTHER_ACTION] = np.stack(
+            [b[SampleBatch.ACTIONS] for b in other_batches], axis=-1)
 
         # print([b[SampleBatch.CUR_OBS].shape for b in other_batches])
         # print([b[SampleBatch.ACTIONS].shape for b in other_batches])

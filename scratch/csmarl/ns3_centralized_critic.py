@@ -25,6 +25,7 @@ tf = try_import_tf()
 OTHER_OBS = "other_obs"
 OTHER_ACTION = "other_action"
 
+
 class CentralizedCriticModel(TFModelV2):
     """Multi-agent model that implements a centralized VF."""
 
@@ -244,8 +245,10 @@ CCTrainer = PPOTrainer.with_updates(name="CCPPOTrainer", default_policy=CCPPO)
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--stop", help="number of timesteps, default 1e8", type=int, default=1e8)
-    parser.add_argument("--debug", help="debug indicator, default false", type=bool, default=False)
+    parser.add_argument(
+        "--stop", help="number of timesteps, default 1e8", type=int, default=1e8)
+    parser.add_argument(
+        "--debug", help="debug indicator, default false", type=bool, default=False)
 
     args = parser.parse_args()
 

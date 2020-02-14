@@ -54,13 +54,14 @@ MyGymEnv::MyGymEnv ()
   NS_LOG_FUNCTION (this);
 }
 
-MyGymEnv::MyGymEnv (NodeContainer agents, Time stepTime, bool enabled = true,
+MyGymEnv::MyGymEnv (NodeContainer agents, Time simTime, Time stepTime, bool enabled = true,
                     bool continuous = false, bool dynamicInterval = false)
 {
   NS_LOG_FUNCTION (this);
   m_agents = agents;
   m_interval = stepTime;
   m_enabled = enabled;
+  m_simTime = simTime;
 
   m_continuous = continuous;
   m_dynamicInterval = dynamicInterval;
@@ -113,6 +114,15 @@ void
 MyGymEnv::DoDispose ()
 {
   NS_LOG_FUNCTION (this);
+  uint32_t numAgents = m_agents.GetN ();
+  uint32_t rxPktSum = 0;
+  for (uint32_t i = 0; i < numAgents; i++)
+    {
+      rxPktSum += m_agent_state[i]->m_rxPktNum;
+      // std::cout << "link " << i << " sent " << m_agent_state[i]->m_rxPktNum << " packets in "
+      //           << m_simTime << std::endl;
+    }
+    std::cout << rxPktSum << std::endl;
 }
 
 Ptr<OpenGymSpace>
@@ -299,7 +309,8 @@ MyGymEnv::GetExtraInfo ()
     {
       myInfo += std::to_string (i);
       myInfo += "=";
-      myInfo += std::to_string ((float)(m_agent_state[i]->m_rxPktNum - m_agent_state[i]->m_rxPktNumLastVal) / 1000.0);
+      myInfo += std::to_string (
+          (float) (m_agent_state[i]->m_rxPktNum - m_agent_state[i]->m_rxPktNumLastVal) / 1000.0);
       m_agent_state[i]->m_rxPktNumLastVal = m_agent_state[i]->m_rxPktNum;
       myInfo += " ";
     }
@@ -400,7 +411,6 @@ MyGymEnv::ExecuteActions (Ptr<OpenGymDataContainer> action)
           uint32_t cwSize = std::pow (2, exponent) - 1;
           SetCw (node, cwSize, cwSize);
         }
-
     }
 
   return true;

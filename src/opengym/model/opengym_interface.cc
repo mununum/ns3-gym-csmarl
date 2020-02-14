@@ -229,6 +229,8 @@ OpenGymInterface::NotifyCurrentState()
   bool isGameOver = IsGameOver();
   std::string extraInfo = GetExtraInfo();
 
+  NS_LOG_DEBUG ("[cc] isGameOver=" << isGameOver);
+
   ns3opengym::EnvStateMsg envStateMsg;
   // observation
   ns3opengym::DataContainer obsDataContainerPbMsg;

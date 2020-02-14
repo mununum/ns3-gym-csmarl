@@ -11,6 +11,7 @@
 #include "ns3/node-list.h"
 
 #include "mygym.h"
+#include "scenario.h"
 
 using namespace ns3;
 
@@ -33,7 +34,8 @@ main (int argc, char *argv[])
   bool dynamicInterval = false;
 
   // Parameters of the scenario
-  uint32_t nFlows = 1;
+  std::string topology = "fim";
+  uint32_t nFlows = 3;
   double distance = 10.0;
   bool noErrors = false;
   std::string errorModelType = "ns3::NistErrorRateModel";
@@ -61,7 +63,9 @@ main (int argc, char *argv[])
   // optional parameters
   cmd.AddValue ("simTime", "Simulation time in seconds, Default: 10s", simulationTime);
   cmd.AddValue ("stepTime", "Step time of the environment, Default: 0.1s", envStepTime);
-  cmd.AddValue ("nFlows", "Number of flows. Default: 1", nFlows);
+  // MYTODO add topologies
+  cmd.AddValue ("topology", "Interference topology. [fc, fim, ...], Default: fim", topology);
+  cmd.AddValue ("nFlows", "Number of flows. Default: 3", nFlows);
   cmd.AddValue ("distance", "Inter node distance. Default: 10m", distance);
   cmd.AddValue ("opengymEnabled", "Using openAI gym or not. Default: true", opengymEnabled);
   cmd.AddValue ("continuous", "Use continuous action space. Default: false", continuous);
@@ -80,6 +84,7 @@ main (int argc, char *argv[])
 
   if (debug)
     {
+      LogComponentEnable ("OpenGym", LOG_LEVEL_DEBUG);
       LogComponentEnable ("MyGymEnv", LOG_LEVEL_DEBUG);
       LogComponentEnable ("OpenGymInterface", LOG_LEVEL_DEBUG);
     }
@@ -143,27 +148,20 @@ main (int argc, char *argv[])
   //     lossModel->SetNext (fadingModel);
   //   }
   // spectrumChannel->AddPropagationLossModel (lossModel);
-  Ptr<MatrixPropagationLossModel> lossModel = CreateObject<MatrixPropagationLossModel> ();
-  // Example: For nodes 0, 1, 2, 3, 4, 5,
-  // 0 -- 1, 2 -- 3, 4 -- 5 will be pairs
-  Ptr<MobilityModel> mobilityS = nodes.Get (0)->GetObject<MobilityModel> ();
-  Ptr<MobilityModel> mobilityR = nodes.Get (1)->GetObject<MobilityModel> ();
-  for (uint32_t i = 2; i < nodeNum; i++)
-    {
-      Ptr<MobilityModel> mobility = nodes.Get (i)->GetObject<MobilityModel> ();
 
-      lossModel->SetLoss (mobilityS, mobility, 0);
-      lossModel->SetLoss (mobilityR, mobility, 0);
-    }
-  for (uint32_t srcNodeId = 0; srcNodeId < nodeNum; srcNodeId += 2)
+  if (topology == "fc")
     {
-      uint32_t dstNodeId = srcNodeId + 1;
-      mobilityS = nodes.Get (srcNodeId)->GetObject<MobilityModel> ();
-      mobilityR = nodes.Get (dstNodeId)->GetObject<MobilityModel> ();
-
-      lossModel->SetLoss (mobilityS, mobilityR, 0);
+      ConfigureFCTopology (spectrumChannel, nodes);
     }
-  spectrumChannel->AddPropagationLossModel (lossModel);
+  else if (topology == "fim")
+    {
+      ConfigureFIMTopology (spectrumChannel, nodes);
+    }
+  else
+    {
+      NS_LOG_ERROR ("invalid topology configuration");
+      exit (1);
+    }
 
   Ptr<ConstantSpeedPropagationDelayModel> delayModel =
       CreateObject<ConstantSpeedPropagationDelayModel> ();
@@ -265,8 +263,9 @@ main (int argc, char *argv[])
 
   // Configure OpenGym environment
   Ptr<OpenGymInterface> openGymInterface = CreateObject<OpenGymInterface> (openGymPort);
-  Ptr<MyGymEnv> myGymEnv = CreateObject<MyGymEnv> (agents, Seconds (envStepTime), opengymEnabled,
-                                                   continuous, dynamicInterval);
+  Ptr<MyGymEnv> myGymEnv =
+      CreateObject<MyGymEnv> (agents, Seconds (simulationTime), Seconds (envStepTime),
+                              opengymEnabled, continuous, dynamicInterval);
 
   myGymEnv->SetOpenGymInterface (openGymInterface);
 

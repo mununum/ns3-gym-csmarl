@@ -18,7 +18,7 @@ class MyGymEnv : public OpenGymEnv
 {
 public:
   MyGymEnv (); // for typeid registration
-  MyGymEnv (NodeContainer agents, Time stepTime, bool enabled, bool continuous,
+  MyGymEnv (NodeContainer agents, Time simTime, Time stepTime, bool enabled, bool continuous,
             bool dynamicInterval);
 
   virtual ~MyGymEnv ();
@@ -55,6 +55,7 @@ private:
 
   std::vector<uint32_t> m_obs_shape;
   Time m_interval = Seconds (0.1);
+  Time m_simTime;
 
   bool m_enabled;
   bool m_continuous;

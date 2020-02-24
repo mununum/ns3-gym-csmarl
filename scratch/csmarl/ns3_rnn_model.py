@@ -97,7 +97,6 @@ if __name__ == "__main__":
 
     tune.run(
         "PPO",
-        # stop={"training_iteration": 1000},
         stop={"timesteps_total": 3e8},
         config={
             "env": Ns3MultiAgentEnv,
@@ -111,9 +110,8 @@ if __name__ == "__main__":
                 "topology": "fc",
             },
             "num_workers": 16,
-            # "num_gpus": 4,
             "num_gpus_per_worker": 0.25,
-            "sgd_minibatch_size": 4000,
+            "sgd_minibatch_size": 4000,  # For maximum parallelism, MYTODO check whether suboptimality happens because of this
             "model": {
                 "custom_model": "rnn",
                 "max_seq_len": 20,

@@ -23,8 +23,8 @@ main (int argc, char *argv[])
 
   // Parameters of the environment
   uint32_t simSeed = 1;
-  double simulationTime = 10; // seconds
-  double envStepTime = 0.1; // seconds, ns3gym env step time interval
+  double simulationTime = 20; // seconds
+  double envStepTime = 0.02; // seconds, ns3gym env step time interval
   uint32_t openGymPort = 5555;
   bool debug = false;
 
@@ -61,8 +61,8 @@ main (int argc, char *argv[])
   cmd.AddValue ("openGymPort", "Port number for OpenGym env. Default: 5555", openGymPort);
   cmd.AddValue ("simSeed", "Seed for random generator. Default: 1", simSeed);
   // optional parameters
-  cmd.AddValue ("simTime", "Simulation time in seconds, Default: 10s", simulationTime);
-  cmd.AddValue ("stepTime", "Step time of the environment, Default: 0.1s", envStepTime);
+  cmd.AddValue ("simTime", "Simulation time in seconds, Default: 20s", simulationTime);
+  cmd.AddValue ("stepTime", "Step time of the environment, Default: 0.02s", envStepTime);
   // MYTODO add topologies
   cmd.AddValue ("topology", "Interference topology. [fc, fim, ...], Default: fim", topology);
   cmd.AddValue ("nFlows", "Number of flows. Default: 3", nFlows);
@@ -298,6 +298,9 @@ main (int argc, char *argv[])
   Simulator::Stop (Seconds (simulationTime));
   Simulator::Run ();
   NS_LOG_UNCOND ("Simulation stop");
+
+  // NS_LOG_UNCOND (myGymEnv->GetTotalPkt ());
+  std::cout << myGymEnv->GetTotalPkt () << std::endl;
 
   openGymInterface->NotifySimulationEnd ();
 

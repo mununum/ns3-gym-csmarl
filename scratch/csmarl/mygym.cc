@@ -110,10 +110,9 @@ MyGymEnv::GetTypeId (void)
   return tid;
 }
 
-void
-MyGymEnv::DoDispose ()
+uint32_t
+MyGymEnv::GetTotalPkt ()
 {
-  NS_LOG_FUNCTION (this);
   uint32_t numAgents = m_agents.GetN ();
   uint32_t rxPktSum = 0;
   for (uint32_t i = 0; i < numAgents; i++)
@@ -122,7 +121,14 @@ MyGymEnv::DoDispose ()
       // std::cout << "link " << i << " sent " << m_agent_state[i]->m_rxPktNum << " packets in "
       //           << m_simTime << std::endl;
     }
-    std::cout << rxPktSum << std::endl;
+  // std::cout << rxPktSum << std::endl;
+  return rxPktSum;
+}
+
+void
+MyGymEnv::DoDispose ()
+{
+  NS_LOG_FUNCTION (this);
 }
 
 Ptr<OpenGymSpace>

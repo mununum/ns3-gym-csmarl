@@ -33,6 +33,8 @@ public:
   std::string GetExtraInfo ();
   bool ExecuteActions (Ptr<OpenGymDataContainer> action);
 
+  uint32_t GetTotalPkt ();
+
   // the function has to be static to work with MakeBoundCallback
   // that is why we pass pointer to MyGymEnv instance to be able to store the context (node, etc)
   // static void NotifyPktRxEvent(Ptr<MyGymEnv> entity, Ptr<Node> node, Ptr<const Packet> packet); // for event-based env

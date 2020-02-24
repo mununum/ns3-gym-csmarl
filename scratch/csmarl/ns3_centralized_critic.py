@@ -58,9 +58,11 @@ class CentralizedCriticModel(TFModelV2):
             shape=(self.n_agents_in_critic,), name="agent_id")  # 3 agents
 
         # NN definition
-        # MYTODO configure
+        # MYTODO do we need agent_id ? verify
+        # concat_input = tf.keras.layers.Concatenate(
+        #     axis=1)([obs, other_obs, other_act, agent_id])
         concat_input = tf.keras.layers.Concatenate(
-            axis=1)([obs, other_obs, other_act, agent_id])
+            axis=1)([obs, other_obs, other_act])
         central_vf_dense = tf.keras.layers.Dense(
             32, activation=tf.nn.tanh, name="c_vf_dense")(concat_input)
         central_vf_out = tf.keras.layers.Dense(
@@ -257,6 +259,7 @@ if __name__ == "__main__":
     else:
         ray.init(log_to_driver=False)
 
+    # MYTODO: make it configurable
     cwd = os.path.dirname(os.path.abspath(__file__))
 
     ModelCatalog.register_custom_model("cc_model", CentralizedCriticModel)

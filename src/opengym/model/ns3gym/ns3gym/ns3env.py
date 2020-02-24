@@ -182,7 +182,6 @@ class Ns3ZmqBridge(object):
             return
 
         request = self.socket.recv()
-        print("[py] State received") if self.debug else None
         envStateMsg = pb.EnvStateMsg()
         envStateMsg.ParseFromString(request)
 

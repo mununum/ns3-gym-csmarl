@@ -128,8 +128,11 @@ def on_episode_step(info):
 def on_episode_end(info):
     episode = info["episode"]
     r_ind_sum = {k: np.sum(v) for k, v in episode.user_data.items()}
+    r_total = 0
     for k, v in r_ind_sum.items():
         episode.custom_metrics[k] = v
+        r_total += v
+    episode.custom_metrics["r_total"] = r_total
 
 
 if __name__ == "__main__":

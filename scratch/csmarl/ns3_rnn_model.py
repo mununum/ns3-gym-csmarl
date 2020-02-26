@@ -2,7 +2,6 @@ import os
 import gym
 from gym.spaces import Discrete
 import numpy as np
-import random
 import argparse
 
 import ray
@@ -13,7 +12,7 @@ from ray.rllib.models.tf.recurrent_tf_modelv2 import RecurrentTFModelV2
 from ray.rllib.utils.annotations import override
 from ray.rllib.utils import try_import_tf
 
-from ns3multiagentenv import Ns3MultiAgentEnv, on_episode_start, on_episode_step, on_episode_end
+from ns3_multiagent_env import Ns3MultiAgentEnv, on_episode_start, on_episode_step, on_episode_end
 
 tf = try_import_tf()
 

@@ -18,7 +18,7 @@ from ray.rllib.utils.explained_variance import explained_variance
 from ray.rllib.utils.tf_ops import make_tf_callable
 from ray.rllib.utils import try_import_tf
 
-from ns3multiagentenv import Ns3MultiAgentEnv, on_episode_start, on_episode_step, on_episode_end
+from ns3_multiagent_env import Ns3MultiAgentEnv, on_episode_start, on_episode_step, on_episode_end
 
 tf = try_import_tf()
 
@@ -29,7 +29,12 @@ OTHER_ACTION = "other_action"
 class CentralizedCriticModel(TFModelV2):
     """Multi-agent model that implements a centralized VF."""
 
-    def __init__(self, obs_space, action_space, num_outputs, model_config, name):
+    def __init__(self,
+                 obs_space,  # Box(4)
+                 action_space,  # Discrete(10)
+                 num_outputs,  # 10
+                 model_config,
+                 name):
         super(CentralizedCriticModel, self).__init__(
             obs_space, action_space, num_outputs, model_config, name)
 
@@ -45,15 +50,15 @@ class CentralizedCriticModel(TFModelV2):
         # Central VF maps (obs, other_obs, other_act, agent_id) -> vf_pred
         # Referenced from COMA critic function
 
-        # MYTODO change static dimenstion assignments
-        self.obs_dim = 4
-        self.act_dim = 10
+        self.obs_dim = obs_space.shape[0]
+        self.act_dim = self.num_outputs
 
-        obs = tf.keras.layers.Input(shape=(4,), name="obs")  # Box(4)
+        obs = tf.keras.layers.Input(shape=(self.obs_dim,), name="obs")  # Box(4)
         other_obs = tf.keras.layers.Input(
             shape=(self.obs_dim * (self.n_agents_in_critic - 1),), name="other_obs")  # Box(4) * 2
         other_act = tf.keras.layers.Input(
             shape=(self.act_dim * (self.n_agents_in_critic - 1),), name="other_act")  # Discrete(10) * 2
+        # MYTODO make proper mapping on agent_id
         agent_id = tf.keras.layers.Input(
             shape=(self.n_agents_in_critic,), name="agent_id")  # 3 agents
 
@@ -64,7 +69,7 @@ class CentralizedCriticModel(TFModelV2):
         concat_input = tf.keras.layers.Concatenate(
             axis=1)([obs, other_obs, other_act])
         central_vf_dense = tf.keras.layers.Dense(
-            32, activation=tf.nn.tanh, name="c_vf_dense")(concat_input)
+            256, activation=tf.nn.tanh, name="c_vf_dense")(concat_input)
         central_vf_out = tf.keras.layers.Dense(
             1, activation=None, name="c_vf_out")(central_vf_dense)
         self.central_vf = tf.keras.Model(
@@ -188,6 +193,14 @@ def loss_with_central_critic(policy, model, dist_class, train_batch):
         train_batch[SampleBatch.CUR_OBS], train_batch[OTHER_OBS],
         train_batch[OTHER_ACTION], train_batch[SampleBatch.AGENT_INDEX])
 
+    if state:
+        max_seq_len = tf.reduce_max(train_batch["seq_lens"])
+        mask = tf.sequence_mask(train_batch["seq_lens"], max_seq_len)
+        mask = tf.reshape(mask, [-1])
+    else:
+        mask = tf.ones_like(
+            train_batch[Postprocessing.ADVANTAGES], dtype=tf.bool)
+
     # VALUE_TARGETS = VF_PREDS + ADVANTAGES
     policy.loss_obj = PPOLoss(
         policy.action_space,
@@ -202,7 +215,7 @@ def loss_with_central_critic(policy, model, dist_class, train_batch):
         action_dist,
         policy.central_value_out,
         policy.kl_coeff,
-        tf.ones_like(train_batch[Postprocessing.ADVANTAGES], dtype=tf.bool),
+        mask,
         entropy_coeff=policy.entropy_coeff,
         clip_param=policy.config["clip_param"],
         vf_clip_param=policy.config["vf_clip_param"],
@@ -271,17 +284,19 @@ if __name__ == "__main__":
         config={
             "env": Ns3MultiAgentEnv,
             "batch_mode": "complete_episodes",
-            "log_level": "DEBUG",
+            "log_level": "DEBUG" if args.debug else "WARN",
             "env_config": {
-                "n_agents": 3,  # environment configuration
+                "n_agents": 12,  # environment configuration
                 "cwd": cwd,
-                "debug": not args.debug
+                "debug": args.debug,
+                "reward": "shared",
+                "topology": "fc",
             },
             "num_workers": 0 if args.debug else 16,
             "model": {
                 "custom_model": "cc_model",
                 "custom_options": {
-                    "n_agents_in_critic": 3,  # n_agents in critic
+                    "n_agents_in_critic": 12,  # n_agents in critic
                 }
             },
             "callbacks": {

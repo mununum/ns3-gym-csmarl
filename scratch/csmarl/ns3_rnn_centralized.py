@@ -144,8 +144,12 @@ if __name__ == "__main__":
 
     NUM_GPUS = 4
     num_workers = 8
-    params_list = [100, 500, 1000, 2000]  # MYTODO remove after finding optimal parameter
-    num_gpus_per_worker = NUM_GPUS / (num_workers * len(params_list))
+    params_list = [0]
+    # params_list = [1000, 2000, 4000]  # for parameter testing
+    num_samples = 4
+    num_workers_total = num_workers * \
+        len(params_list) * num_samples  # <= 32 is recommended
+    num_gpus_per_worker = NUM_GPUS / num_workers_total
 
     tune.run(
         CCTrainer,
@@ -165,7 +169,7 @@ if __name__ == "__main__":
             },
             "num_workers": 0 if args.debug else num_workers,
             "num_gpus_per_worker": num_gpus_per_worker,
-            "sgd_minibatch_size": tune.grid_search(params_list),
+            "sgd_minibatch_size": 2000,
             "model": {
                 "custom_model": "cc_rnn_model",
                 "custom_options": {
@@ -177,5 +181,6 @@ if __name__ == "__main__":
                 "on_episode_step": on_episode_step,
                 "on_episode_end": on_episode_end
             }
-        }
+        },
+        num_samples=num_samples,
     )

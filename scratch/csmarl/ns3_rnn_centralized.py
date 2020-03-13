@@ -142,13 +142,25 @@ if __name__ == "__main__":
     ModelCatalog.register_custom_model(
         "cc_rnn_model", CentralizedCriticRNNModel)
 
+    config_params = [0]
+    env_config = {  # environment configuration
+        "n_agents": 3,
+        "cwd": cwd,
+        "debug": args.debug,
+        "reward": "shared",
+        "topology": "fim",
+    }
+    # config_params = [FILL]  # for env config testing
+    # env_config = tune.grid_search(config_params)
+
+
     NUM_GPUS = 4
     num_workers = 8
     params_list = [0]
-    # params_list = [1000, 2000, 4000]  # for parameter testing
-    num_samples = 4
+    # params_list = [FILL]  # for parameter testing
+    num_samples = 2
     num_workers_total = num_workers * \
-        len(params_list) * num_samples  # <= 32 is recommended
+        len(params_list) * len(config_params) * num_samples  # <= 32 is recommended
     num_gpus_per_worker = NUM_GPUS / num_workers_total
 
     tune.run(
@@ -160,13 +172,7 @@ if __name__ == "__main__":
             "env": Ns3MultiAgentEnv,
             "batch_mode": "complete_episodes",
             "log_level": "DEBUG" if args.debug else "WARN",
-            "env_config": {  # environment configuration
-                "n_agents": 3,
-                "cwd": cwd,
-                "debug": args.debug,
-                "reward": "shared",
-                "topology": "fim",
-            },
+            "env_config": env_config,
             "num_workers": 0 if args.debug else num_workers,
             "num_gpus_per_worker": num_gpus_per_worker,
             "sgd_minibatch_size": 2000,
@@ -182,5 +188,5 @@ if __name__ == "__main__":
                 "on_episode_end": on_episode_end
             }
         },
-        num_samples=num_samples,
+        num_samples=1 if args.debug else num_samples,
     )

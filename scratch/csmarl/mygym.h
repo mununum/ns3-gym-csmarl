@@ -49,6 +49,7 @@ public:
 
 private:
   void ScheduleNextStateRead ();
+  void StepState ();
   Ptr<WifiMacQueue> GetQueue (Ptr<Node> node);
   bool SetCw (Ptr<Node> node, uint32_t cwMinValue = 0, uint32_t cwMaxValue = 0);
 
@@ -62,6 +63,8 @@ private:
   bool m_enabled;
   bool m_continuous;
   bool m_dynamicInterval;
+
+  const uint32_t m_perAgentObsDim = 4;  // Throughput, Latency, Loss%, CW
 };
 
 } // namespace ns3

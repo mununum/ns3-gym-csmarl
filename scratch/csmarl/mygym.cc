@@ -14,6 +14,21 @@ NS_LOG_COMPONENT_DEFINE ("MyGymEnv");
 
 NS_OBJECT_ENSURE_REGISTERED (MyGymEnv);
 
+static inline double
+updateEwma (uint64_t &value, uint64_t &lastValue, double &ewmaValue, const double ewmaWeight)
+{
+  double currentValue = value - lastValue;
+  if (lastValue == 0)
+    {
+      ewmaValue = currentValue;
+    }
+  else
+    {
+      ewmaValue = ewmaWeight * ewmaValue + (1 - ewmaWeight) * currentValue;
+    }
+  return ewmaValue;
+}
+
 class MyGymNodeState : public Object
 {
 
@@ -21,10 +36,12 @@ class MyGymNodeState : public Object
 
 public:
   MyGymNodeState ()
-      : m_txPktBytes (0),
-        m_txPktCount (0),
+      : m_txPktNum (0),
+        m_txPktNumLastVal (0),
         m_rxPktNum (0),
         m_rxPktNumLastVal (0),
+        m_txPktNumMovingAverage (0.0),
+        m_rxPktNumMovingAverage (0.0),
         m_delaySum (Seconds (0.0)),
         m_delay_estimator (CreateObject<DelayJitterEstimation> ())
   {
@@ -33,17 +50,20 @@ public:
   void
   Reset ()
   {
-    m_txPktBytes = 0;
-    m_txPktCount = 0;
+    m_txPktNumLastVal = m_txPktNum;
+    m_rxPktNumLastVal = m_rxPktNum;
     m_delaySum = Seconds (0.0);
   }
 
 private:
-  uint64_t m_txPktBytes;
-  uint64_t m_txPktCount;
+  uint64_t m_txPktNum;
+  uint64_t m_txPktNumLastVal;
 
   uint64_t m_rxPktNum;
   uint64_t m_rxPktNumLastVal;
+
+  double m_txPktNumMovingAverage;
+  double m_rxPktNumMovingAverage;
 
   Time m_delaySum;
   Ptr<DelayJitterEstimation> m_delay_estimator;
@@ -92,7 +112,27 @@ MyGymEnv::ScheduleNextStateRead ()
       GetExtraInfo ();
     }
 
+  StepState ();
+
   Simulator::Schedule (m_interval, &MyGymEnv::ScheduleNextStateRead, this);
+}
+
+void
+MyGymEnv::StepState ()
+{
+  uint32_t numAgents = m_agents.GetN ();
+
+  for (uint32_t i = 0; i < numAgents; i++)
+    {
+      Ptr<Node> node = m_agents.Get (i);
+      Ptr<NetDevice> dev = node->GetDevice (0);
+      Ptr<WifiNetDevice> wifi_dev = DynamicCast<WifiNetDevice> (dev);
+      Ptr<WifiRemoteStationManager> rman = wifi_dev->GetRemoteStationManager ();
+
+      // reset every statistics
+      m_agent_state[i]->Reset ();
+      rman->GetAggInfo ().Reset ();
+    }
 }
 
 MyGymEnv::~MyGymEnv ()
@@ -175,8 +215,7 @@ MyGymEnv::GetObservationSpace ()
 {
   NS_LOG_FUNCTION (this);
   uint32_t agentNum = m_agents.GetN ();
-  uint32_t perAgentObsDim = 4; // Throughput, Latency, Loss%, CW
-  m_obs_shape = {agentNum, perAgentObsDim};
+  m_obs_shape = {agentNum, m_perAgentObsDim};
 
   float low = 0.0;
   float high = 10000.0;
@@ -229,18 +268,22 @@ MyGymEnv::GetObservation ()
     {
       Ptr<Node> node = m_agents.Get (i);
 
-      NS_LOG_DEBUG ("# of pkts sent: " << m_agent_state[i]->m_txPktCount);
+      NS_LOG_DEBUG ("# of pkts sent: " << m_agent_state[i]->m_txPktNum);
 
       // collect statistics
-      // MYTODO make proper normalization
       // Throughput
-      double thpt = m_agent_state[i]->m_txPktBytes;
+      double thpt = (m_agent_state[i]->m_txPktNum - m_agent_state[i]->m_txPktNumLastVal) / 1000.0;
       thpt /= 1000;
+
+      // XXX moving average?
+      // double avg_thpt = updateEwma (m_agent_state[i]->m_txPktNum, m_agent_state[i]->m_txPktNumLastVal, m_agent_state[i]->m_txPktNumMovingAverage, 0.9);
+      // avg_thpt /= 1000;
+
       // Latency
       double lat;
-      if (m_agent_state[i]->m_txPktCount > 0)
+      if (m_agent_state[i]->m_txPktNum > 0)
         {
-          lat = (m_agent_state[i]->m_delaySum / m_agent_state[i]->m_txPktCount).GetDouble ();
+          lat = (m_agent_state[i]->m_delaySum / m_agent_state[i]->m_txPktNum).GetDouble ();
         }
       else
         {
@@ -249,7 +292,7 @@ MyGymEnv::GetObservation ()
       lat /= 1e9; // latency unit: sec
 
       delaySum += m_agent_state[i]->m_delaySum;
-      pktSum += m_agent_state[i]->m_txPktCount;
+      pktSum += m_agent_state[i]->m_txPktNum;
 
       // Loss%
       Ptr<NetDevice> dev = node->GetDevice (0);
@@ -267,13 +310,10 @@ MyGymEnv::GetObservation ()
 
       // put it in a box
       box->AddValue (thpt);
+      // box->AddValue (avg_thpt);
       box->AddValue (lat);
       box->AddValue (err_rate);
       box->AddValue (mincw);
-
-      // reset every statistics
-      m_agent_state[i]->Reset ();
-      rman->GetAggInfo ().Reset ();
     }
 
   if (m_dynamicInterval && pktSum > 0)
@@ -296,13 +336,25 @@ float
 MyGymEnv::GetReward ()
 {
   NS_LOG_FUNCTION (this);
+  // const double epsilon = 5e-5;
+  const double lower_bound = 0.1;
   float reward = 0.0;
   for (uint32_t i = 0; i < m_agents.GetN (); i++)
     {
-      reward += m_agent_state[i]->m_rxPktNum - m_agent_state[i]->m_rxPktNumLastVal;
+      double avg_rate =
+          updateEwma (m_agent_state[i]->m_rxPktNum, m_agent_state[i]->m_rxPktNumLastVal,
+                      m_agent_state[i]->m_rxPktNumMovingAverage, 0.9);
+
+      // log(5e-5) ~= -10, this prevents logarithm from being minus infinity
+      // reward += std::log (avg_rate + epsilon) / 1000.0;
+
+      // the moving average will be always bigger than 0.1
+      reward += std::log ( std::max (avg_rate, lower_bound) ) / 1000.0;
+
+      // reward += avg_rate / 1000.0;  // sum-rate reward function
     }
   NS_LOG_DEBUG ("MyGetReward: " << reward);
-  return reward / 1000.0;
+  return reward;
 }
 
 std::string
@@ -317,7 +369,6 @@ MyGymEnv::GetExtraInfo ()
       myInfo += "=";
       myInfo += std::to_string (
           (float) (m_agent_state[i]->m_rxPktNum - m_agent_state[i]->m_rxPktNumLastVal) / 1000.0);
-      m_agent_state[i]->m_rxPktNumLastVal = m_agent_state[i]->m_rxPktNum;
       myInfo += " ";
     }
 
@@ -462,8 +513,8 @@ MyGymEnv::SrcTxDone (Ptr<MyGymEnv> entity, Ptr<Node> node, uint32_t idx, const W
     {
       // record TX throughput and latency only when it is a unicast frame
       Ptr<MyGymNodeState> state = entity->m_agent_state[idx];
-      state->m_txPktCount++;
-      state->m_txPktBytes += packet->GetSize ();
+      state->m_txPktNum++;
+      // state->m_txPktBytes += packet->GetSize ();
       state->m_delay_estimator->RecordRx (packet);
       state->m_delaySum += state->m_delay_estimator->GetLastDelay ();
     }

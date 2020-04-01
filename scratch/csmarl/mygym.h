@@ -18,8 +18,7 @@ class MyGymEnv : public OpenGymEnv
 {
 public:
   MyGymEnv (); // for typeid registration
-  MyGymEnv (NodeContainer agents, Time simTime, Time stepTime, bool enabled, bool continuous,
-            bool dynamicInterval);
+  MyGymEnv (NodeContainer agents, Time simTime, Time stepTime, bool enabled, bool continuous);
 
   virtual ~MyGymEnv ();
   static TypeId GetTypeId (void);
@@ -62,9 +61,8 @@ private:
 
   bool m_enabled;
   bool m_continuous;
-  bool m_dynamicInterval;
 
-  const uint32_t m_perAgentObsDim = 4;  // Throughput, Latency, Loss%, CW
+  uint32_t m_perAgentObsDim;
 };
 
 } // namespace ns3

@@ -1,4 +1,5 @@
 import os
+import argparse
 import gym
 import numpy as np
 import ray
@@ -53,8 +54,11 @@ class Ns3MultiAgentEnv(MultiAgentEnv):
         return {int(kv.split('=')[0]): float(kv.split('=')[1])
                 for kv in info.split()}
 
-    def parse_info(self, info):
-        return {int(kv.split('=')[0]): {"r_ind": float(kv.split('=')[1])}
+    def parse_info(self, info, state):
+        return {int(kv.split('=')[0]): {
+                    "r_ind": float(kv.split('=')[1]),
+                    "state": np.array(state),
+                }
                 for kv in info.split()}
 
     def reset(self):
@@ -73,7 +77,7 @@ class Ns3MultiAgentEnv(MultiAgentEnv):
         else:
             raise AssertionError
         done = {"__all__": d}
-        info = self.parse_info(i)
+        info = self.parse_info(i, state=o)
         return obs, rew, done, info
 
     def close(self):
@@ -110,59 +114,51 @@ def on_episode_end(info):
 
 if __name__ == "__main__":
 
-    # register_env("dummy_multiagent_env",
-    #              lambda env_config: DummyMultiAgentEnv(3, env_config))
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--stop", help="number of timesteps, default 3e8", type=int, default=3e8)
+    parser.add_argument(
+        "--debug", help="debug indicator, default false", type=bool, default=False)
 
-    ray.init(log_to_driver=False)
+    args = parser.parse_args()
+
+    ray.init(log_to_driver=args.debug)
     cwd = os.path.dirname(os.path.abspath(__file__))
 
-    # with DummyEnv(None) as single_env:
-    #     obs_space = single_env.observation_space
-    #     act_space = single_env.action_space
+    NUM_GPUS = 4
+    num_workers = 4
 
-    # temporary single environment for extracting single obs/act dim
-    # with ns3env.Ns3Env(port=0, startSim=True, simArgs={
-    #         "--nFlows": 1}, cwd=cwd) as single_env:
-    #     multi_obs_space = single_env.observation_space
-    #     multi_act_space = single_env.action_space
-    #     obs_space = gym.spaces.Box(
-    #         low=multi_obs_space.low[0], high=multi_obs_space.high[0], dtype=multi_obs_space.dtype)
-    #     act_space = multi_act_space.spaces[0]
-
-    # print(obs_space)
-    # print(act_space)
-    # exit()
+    if args.debug:
+        params_list = [0]
+    else:
+        # params_list = [0]
+        params_list = [5e-4, 5e-5, 5e-6, 5e-7]  # for parameter testing
+    num_samples = 1
+    num_workers_total = num_workers * len(params_list) * num_samples  # <= 32 is recommended
+    num_gpus_per_worker = NUM_GPUS / num_workers_total
 
     tune.run(
         "PPO",
-        stop={"training_iteration": 3000},
+        stop={"timesteps_total": args.stop},
         config={
-            # "env": "ns3_multiagent_env",
             "env": Ns3MultiAgentEnv,
             "batch_mode": "complete_episodes",
-            "log_level": "DEBUG",
-            # "lr": 1e-4,
-            "num_workers": 16,
-            # "multiagent": {
-            #     "policies": {
-            #         "policy_0": (None, obs_space, act_space, {}),
-            #         # "policy_1": (None, obs_space, act_space, {}),
-            #         # "policy_2": (None, obs_space, act_space, {})
-            #     },
-            #     # "policy_mapping_fn": lambda i: "policy_"+str(i)
-            #     "policy_mapping_fn": lambda _: "policy_0"
-            # },
+            "log_level": "DEBUG" if args.debug else "WARN",
+            "num_workers": 0 if args.debug else num_workers,
+            "num_gpus_per_worker": num_gpus_per_worker,
+            "lr": 5e-5 if args.debug else tune.grid_search(params_list),
             "env_config": {
-                "n_agents": 12,
+                "n_agents": 3,
                 "cwd": cwd,
-                "debug": True,
+                "debug": args.debug,
                 "reward": "shared",
-                "topology": "fc"
+                "topology": "fim"
             },
             "callbacks": {
                 "on_episode_start": on_episode_start,
                 "on_episode_step": on_episode_step,
                 "on_episode_end": on_episode_end
             },
-        }
+        },
+        num_samples=1 if args.debug else num_samples,
     )

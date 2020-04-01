@@ -31,7 +31,6 @@ main (int argc, char *argv[])
   // OpenGym Env
   bool opengymEnabled = true;
   bool continuous = false;
-  bool dynamicInterval = false;
 
   // Parameters of the scenario
   std::string topology = "fim";
@@ -69,8 +68,6 @@ main (int argc, char *argv[])
   cmd.AddValue ("distance", "Inter node distance. Default: 10m", distance);
   cmd.AddValue ("opengymEnabled", "Using openAI gym or not. Default: true", opengymEnabled);
   cmd.AddValue ("continuous", "Use continuous action space. Default: false", continuous);
-  cmd.AddValue ("dynamicInterval", "Dynamically changing step interval. Default: false",
-                dynamicInterval);
   cmd.AddValue ("debug", "Print debug message. Default: false", debug);
   cmd.Parse (argc, argv);
 
@@ -78,7 +75,6 @@ main (int argc, char *argv[])
   NS_LOG_UNCOND ("--simulationTime: " << simulationTime);
   NS_LOG_UNCOND ("--openGymPort: " << openGymPort);
   NS_LOG_UNCOND ("--envStepTime: " << envStepTime);
-  NS_LOG_UNCOND ("--dynamicInterval: " << dynamicInterval);
   NS_LOG_UNCOND ("--seed: " << simSeed);
   NS_LOG_UNCOND ("--distance: " << distance);
 
@@ -265,7 +261,7 @@ main (int argc, char *argv[])
   Ptr<OpenGymInterface> openGymInterface = CreateObject<OpenGymInterface> (openGymPort);
   Ptr<MyGymEnv> myGymEnv =
       CreateObject<MyGymEnv> (agents, Seconds (simulationTime), Seconds (envStepTime),
-                              opengymEnabled, continuous, dynamicInterval);
+                              opengymEnabled, continuous);
 
   myGymEnv->SetOpenGymInterface (openGymInterface);
 

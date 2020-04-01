@@ -75,7 +75,7 @@ MyGymEnv::MyGymEnv ()
 }
 
 MyGymEnv::MyGymEnv (NodeContainer agents, Time simTime, Time stepTime, bool enabled = true,
-                    bool continuous = false, bool dynamicInterval = false)
+                    bool continuous = false)
 {
   NS_LOG_FUNCTION (this);
   m_agents = agents;
@@ -84,7 +84,6 @@ MyGymEnv::MyGymEnv (NodeContainer agents, Time simTime, Time stepTime, bool enab
   m_simTime = simTime;
 
   m_continuous = continuous;
-  m_dynamicInterval = dynamicInterval;
 
   // initialize per-agent internal state
   uint32_t numAgents = m_agents.GetN ();
@@ -92,6 +91,9 @@ MyGymEnv::MyGymEnv (NodeContainer agents, Time simTime, Time stepTime, bool enab
     {
       m_agent_state.push_back (CreateObject<MyGymNodeState> ());
     }
+
+  m_perAgentObsDim = 5;  // Throughput, AvgThpt, Latency, Loss%, CW
+  // m_perAgentObsDim++;  // agent_index
 
   Simulator::Schedule (Seconds (0.0), &MyGymEnv::ScheduleNextStateRead, this);
 }
@@ -276,8 +278,8 @@ MyGymEnv::GetObservation ()
       thpt /= 1000;
 
       // XXX moving average?
-      // double avg_thpt = updateEwma (m_agent_state[i]->m_txPktNum, m_agent_state[i]->m_txPktNumLastVal, m_agent_state[i]->m_txPktNumMovingAverage, 0.9);
-      // avg_thpt /= 1000;
+      double avg_thpt = updateEwma (m_agent_state[i]->m_txPktNum, m_agent_state[i]->m_txPktNumLastVal, m_agent_state[i]->m_txPktNumMovingAverage, 0.9);
+      avg_thpt /= 1000;
 
       // Latency
       double lat;
@@ -310,15 +312,13 @@ MyGymEnv::GetObservation ()
 
       // put it in a box
       box->AddValue (thpt);
-      // box->AddValue (avg_thpt);
+      box->AddValue (avg_thpt);
       box->AddValue (lat);
       box->AddValue (err_rate);
       box->AddValue (mincw);
-    }
 
-  if (m_dynamicInterval && pktSum > 0)
-    {
-      m_interval = delaySum / pktSum * 10;
+      // agent_id
+      // box->AddValue (i);
     }
 
   // for (NodeList::Iterator i = NodeList::Begin (); i != NodeList::End (); ++i) {
@@ -336,9 +336,9 @@ float
 MyGymEnv::GetReward ()
 {
   NS_LOG_FUNCTION (this);
-  // const double epsilon = 5e-5;
+  const double epsilon = 5e-5;
   const double lower_bound = 0.1;
-  float reward = 0.0;
+  float reward = 0.0, reward_min = 0.0;
   for (uint32_t i = 0; i < m_agents.GetN (); i++)
     {
       double avg_rate =
@@ -346,13 +346,16 @@ MyGymEnv::GetReward ()
                       m_agent_state[i]->m_rxPktNumMovingAverage, 0.9);
 
       // log(5e-5) ~= -10, this prevents logarithm from being minus infinity
-      // reward += std::log (avg_rate + epsilon) / 1000.0;
+      reward += std::log (avg_rate + epsilon) / 1000.0;
 
       // the moving average will be always bigger than 0.1
-      reward += std::log ( std::max (avg_rate, lower_bound) ) / 1000.0;
+      // reward += std::log ( std::max (avg_rate, lower_bound) ) / 1000.0;
+
+      reward_min += std::log (lower_bound) / 1000.0;
 
       // reward += avg_rate / 1000.0;  // sum-rate reward function
     }
+  reward = std::max (reward, reward_min);
   NS_LOG_DEBUG ("MyGetReward: " << reward);
   return reward;
 }

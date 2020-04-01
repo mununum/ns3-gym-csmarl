@@ -23,7 +23,9 @@ from ns3_multiagent_env import Ns3MultiAgentEnv, on_episode_start, on_episode_st
 tf = try_import_tf()
 
 OTHER_OBS = "other_obs"
-OTHER_ACTION = "other_action"
+OTHER_ACT = "other_act"
+
+STATE = "state"
 
 
 class CentralizedCriticModel(TFModelV2):
@@ -53,9 +55,12 @@ class CentralizedCriticModel(TFModelV2):
         self.obs_dim = obs_space.shape[0]
         self.act_dim = self.num_outputs
 
+        # (obs, state, other_act, agent_id) -> vf_pred
+        state = tf.keras.layers.Input(shape=(self.obs_dim * self.n_agents_in_critic, ), name="state")
+
         obs = tf.keras.layers.Input(shape=(self.obs_dim,), name="obs")  # Box(4)
-        other_obs = tf.keras.layers.Input(
-            shape=(self.obs_dim * (self.n_agents_in_critic - 1),), name="other_obs")  # Box(4) * 2
+        # other_obs = tf.keras.layers.Input(
+        #     shape=(self.obs_dim * (self.n_agents_in_critic - 1),), name="other_obs")  # Box(4) * 2
         other_act = tf.keras.layers.Input(
             shape=(self.act_dim * (self.n_agents_in_critic - 1),), name="other_act")  # Discrete(10) * 2
         # MYTODO make proper mapping on agent_id
@@ -66,26 +71,30 @@ class CentralizedCriticModel(TFModelV2):
         # MYTODO do we need agent_id ? verify
         # concat_input = tf.keras.layers.Concatenate(
         #     axis=1)([obs, other_obs, other_act, agent_id])
+        # concat_input = tf.keras.layers.Concatenate(
+        #     axis=1)([obs, other_obs, other_act])
+
         concat_input = tf.keras.layers.Concatenate(
-            axis=1)([obs, other_obs, other_act])
+            axis=1)([obs, state, other_act, agent_id])
+
         central_vf_dense = tf.keras.layers.Dense(
             256, activation=tf.nn.tanh, name="c_vf_dense")(concat_input)
         central_vf_out = tf.keras.layers.Dense(
             1, activation=None, name="c_vf_out")(central_vf_dense)
         self.central_vf = tf.keras.Model(
-            inputs=[obs, other_obs, other_act, agent_id], outputs=central_vf_out)
+            inputs=[obs, state, other_act, agent_id], outputs=central_vf_out)
         self.register_variables(self.central_vf.variables)
 
     def forward(self, input_dict, state, seq_lens):
         return self.model.forward(input_dict, state, seq_lens)
 
-    def central_value_function(self, obs, other_obs, other_actions, agent_id):
+    def central_value_function(self, obs, state, other_act, agent_id):
         # XXX Currently concatenated onehot for joint other-actions
-        other_actions_onehot = tf.reshape(
-            tf.one_hot(other_actions, self.act_dim), [-1, self.act_dim * (self.n_agents_in_critic - 1)])
+        other_act_onehot = tf.reshape(
+            tf.one_hot(other_act, self.act_dim), [-1, self.act_dim * (self.n_agents_in_critic - 1)])
         agent_id_onehot = tf.one_hot(agent_id, self.n_agents_in_critic)
         return tf.reshape(
-            self.central_vf([obs, other_obs, other_actions_onehot, agent_id_onehot]), [-1])
+            self.central_vf([obs, state, other_act_onehot, agent_id_onehot]), [-1])
 
     def value_function(self):
         return self.model.value_function()  # not used
@@ -117,38 +126,60 @@ def centralized_critic_postprocessing(policy,
 
         # also record the opponent obs and actions in the trajectory
         # sample_batch[OTHER_OBS] = other_batch[SampleBatch.CUR_OBS]
-        # sample_batch[OTHER_ACTION] = other_batch[SampleBatch.ACTIONS]
+        # sample_batch[OTHER_ACT] = other_batch[SampleBatch.ACTIONS]
+
+        # print(sample_batch[SampleBatch.INFOS])
+        # print(sample_batch[SampleBatch.INFOS].shape)
+        sample_batch[STATE] = np.array(
+            [i["state"] for i in sample_batch[SampleBatch.INFOS]],
+            dtype=np.float32
+        ) # (T, 12)
 
         # NOTE shape of batches
         # b[SampleBatch.CUR_OBS] = (T, 4)
         # b[SampleBatch.ACTIONS] = (T,)
-        sample_batch[OTHER_OBS] = np.concatenate(
-            [b[SampleBatch.CUR_OBS] for b in other_batches], axis=-1)
-        sample_batch[OTHER_ACTION] = np.stack(
-            [b[SampleBatch.ACTIONS] for b in other_batches], axis=-1)
+        # sample_batch[OTHER_OBS] = np.concatenate(
+        #     [b[SampleBatch.CUR_OBS] for b in other_batches], axis=-1)  # (T, 8)
+        sample_batch[OTHER_ACT] = np.stack(
+            [b[SampleBatch.ACTIONS] for b in other_batches], axis=-1)  # (T, 2)
 
         # print([b[SampleBatch.CUR_OBS].shape for b in other_batches])
         # print([b[SampleBatch.ACTIONS].shape for b in other_batches])
         # print(sample_batch[OTHER_OBS].shape)
-        # print(sample_batch[OTHER_ACTION].shape)
+        # print(sample_batch[OTHER_ACT].shape)
+
+        # print(sample_batch[SampleBatch.CUR_OBS].shape)  # (T, 4)
+        # print(sample_batch[OTHER_OBS].shape)  # (T, 8)
+        # print(sample_batch[OTHER_ACT].shape)  # (T, 2)
+        # print(sample_batch[SampleBatch.AGENT_INDEX].shape)  # (T,)
+        # print(sample_batch[STATE].shape)  # (T, 12)
+        # (obs, state, other_act, agent_id)
 
         # overwrite default VF prediction with the central VF
+        # sample_batch[SampleBatch.VF_PREDS] = policy.compute_central_vf(
+        #     sample_batch[SampleBatch.CUR_OBS], sample_batch[OTHER_OBS],
+        #     sample_batch[OTHER_ACT], sample_batch[SampleBatch.AGENT_INDEX])
+
         sample_batch[SampleBatch.VF_PREDS] = policy.compute_central_vf(
-            sample_batch[SampleBatch.CUR_OBS], sample_batch[OTHER_OBS],
-            sample_batch[OTHER_ACTION], sample_batch[SampleBatch.AGENT_INDEX])
+            sample_batch[SampleBatch.CUR_OBS], sample_batch[STATE],
+            sample_batch[OTHER_ACT], sample_batch[SampleBatch.AGENT_INDEX])
     else:
         # policy hasn't initialized yet, use zeros
         # This initialization will be placeholders in model definition
         # sample_batch[OTHER_OBS] = np.zeros_like(
         #     sample_batch[SampleBatch.CUR_OBS])
-        # sample_batch[OTHER_ACTION] = np.zeros_like(
+        # sample_batch[OTHER_ACT] = np.zeros_like(
         #     sample_batch[SampleBatch.ACTIONS])
+
+        sample_batch[STATE] = np.zeros_like(
+            np.tile(sample_batch[SampleBatch.CUR_OBS], n_agents_in_critic)
+        )  # (1, 12)
 
         sample_batch[OTHER_OBS] = np.zeros_like(
             np.tile(sample_batch[SampleBatch.CUR_OBS], n_agents_in_critic - 1)
         )  # (1, 8)
         # NOTE This works for action space with shape ()
-        sample_batch[OTHER_ACTION] = np.zeros_like(
+        sample_batch[OTHER_ACT] = np.zeros_like(
             np.tile(sample_batch[SampleBatch.ACTIONS],
                     (1, n_agents_in_critic - 1))
         )  # (1, 2)
@@ -189,9 +220,12 @@ def loss_with_central_critic(policy, model, dist_class, train_batch):
 
     logits, state = model.from_batch(train_batch)
     action_dist = dist_class(logits, model)
+    # policy.central_value_out = policy.model.central_value_function(
+    #     train_batch[SampleBatch.CUR_OBS], train_batch[OTHER_OBS],
+    #     train_batch[OTHER_ACT], train_batch[SampleBatch.AGENT_INDEX])
     policy.central_value_out = policy.model.central_value_function(
-        train_batch[SampleBatch.CUR_OBS], train_batch[OTHER_OBS],
-        train_batch[OTHER_ACTION], train_batch[SampleBatch.AGENT_INDEX])
+        train_batch[SampleBatch.CUR_OBS], train_batch[STATE],
+        train_batch[OTHER_ACT], train_batch[SampleBatch.AGENT_INDEX])
 
     if state:
         max_seq_len = tf.reduce_max(train_batch["seq_lens"])
@@ -267,10 +301,7 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    if args.debug:
-        ray.init()
-    else:
-        ray.init(log_to_driver=False)
+    ray.init(log_to_driver=args.debug)
 
     # MYTODO: make it configurable
     cwd = os.path.dirname(os.path.abspath(__file__))
@@ -286,17 +317,18 @@ if __name__ == "__main__":
             "batch_mode": "complete_episodes",
             "log_level": "DEBUG" if args.debug else "WARN",
             "env_config": {
-                "n_agents": 12,  # environment configuration
+                "n_agents": 3,  # environment configuration
                 "cwd": cwd,
                 "debug": args.debug,
                 "reward": "shared",
-                "topology": "fc",
+                "topology": "fim",
             },
             "num_workers": 0 if args.debug else 16,
+            "use_gae": False,
             "model": {
                 "custom_model": "cc_model",
                 "custom_options": {
-                    "n_agents_in_critic": 12,  # n_agents in critic
+                    "n_agents_in_critic": 3,  # n_agents in critic
                 }
             },
             "callbacks": {

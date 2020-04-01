@@ -88,29 +88,54 @@ class MyKerasRNN(RecurrentTFModelV2):
 
 
 if __name__ == "__main__":
-    ray.init(log_to_driver=False)
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--stop", help="number of timesteps, default 3e8", type=int, default=3e8)
+    parser.add_argument(
+        "--debug", help="debug indicator, default false", type=bool, default=False)
+
+    args = parser.parse_args()
+
+    ray.init(log_to_driver=args.debug)
 
     ModelCatalog.register_custom_model("rnn", MyKerasRNN)
 
     cwd = os.path.dirname(os.path.abspath(__file__))
 
+    NUM_GPUS = 4
+    num_workers = 4
+
+    if args.debug:
+        params_list = [0]
+    else:
+        # params_list = [0]
+        params_list = [5e-4, 5e-5, 5e-6, 5e-7]  # for parameter testing
+    num_samples = 4
+    num_workers_total = num_workers * len(params_list) * num_samples # <= 32 is recommended
+    num_gpus_per_worker = NUM_GPUS / num_workers_total
+
     tune.run(
         "PPO",
-        stop={"timesteps_total": 3e8},
+        stop={
+            "timesteps_total": args.stop
+        },
         config={
             "env": Ns3MultiAgentEnv,
             "batch_mode": "complete_episodes",
-            "log_level": "DEBUG",
+            "log_level": "DEBUG" if args.debug else "WARN",
             "env_config": {
-                "n_agents": 12,
+                "n_agents": 3,
                 "cwd": cwd,
-                "debug": False,
+                "debug": args.debug,
                 "reward": "shared",
-                "topology": "fc",
+                "topology": "fim",
             },
-            "num_workers": 16,
-            "num_gpus_per_worker": 0.25,
-            "sgd_minibatch_size": 4000,  # For maximum parallelism, MYTODO check whether suboptimality happens because of this
+            "num_workers": 0 if args.debug else num_workers,
+            "num_gpus_per_worker": num_gpus_per_worker,
+            "lr": 5e-4 if args.debug else tune.grid_search(params_list),
+            "use_gae": True,
+            "sgd_minibatch_size": 2000,  # For maximum parallelism, MYTODO check whether suboptimality happens because of this
             "model": {
                 "custom_model": "rnn",
                 "max_seq_len": 20,

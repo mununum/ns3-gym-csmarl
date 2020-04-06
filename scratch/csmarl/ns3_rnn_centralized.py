@@ -178,14 +178,17 @@ if __name__ == "__main__":
 
 
     NUM_GPUS = 4
-    num_workers = 4
+    num_workers = 16
+
     if args.debug:
         params_list = [0]
     else:
-        # params_list = [0]
-        params_list = [5e-4, 5e-5, 5e-6, 5e-7]  # for parameter testing
+        params_list = [0]
+        # params_list = [5e-4, 5e-5, 5e-6, 5e-7]  # for parameter testing
         # params_list = [1, 0.8, 0.5, 0]
+
     num_samples = 1
+    
     num_workers_total = num_workers * \
         len(params_list) * len(config_params) * num_samples  # <= 32 is recommended
     num_gpus_per_worker = NUM_GPUS / num_workers_total
@@ -202,7 +205,8 @@ if __name__ == "__main__":
             "env_config": env_config,
             "num_workers": 0 if args.debug else num_workers,
             "num_gpus_per_worker": num_gpus_per_worker,
-            "lr": 5e-4 if args.debug else tune.grid_search(params_list),
+            "lr": 5e-4,
+            # "lr": 5e-4 if args.debug else tune.grid_search(params_list),
             # "lambda": 1 if args.debug else tune.grid_search(params_list),
             "use_gae": False,
             "sgd_minibatch_size": 2000,

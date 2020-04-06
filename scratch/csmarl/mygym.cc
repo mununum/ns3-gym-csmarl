@@ -55,6 +55,13 @@ public:
     m_delaySum = Seconds (0.0);
   }
 
+  double
+  getAvgTxDelay ()
+  {
+    uint64_t currentTxPktNum = m_txPktNum - m_txPktNumLastVal;
+    return (currentTxPktNum > 0) ? (m_delaySum / currentTxPktNum).GetDouble () : 0.0;
+  }
+
 private:
   uint64_t m_txPktNum;
   uint64_t m_txPktNumLastVal;
@@ -194,7 +201,6 @@ MyGymEnv::GetActionSpace ()
     }
   else
     {
-
       int n_actions = 10;
       Ptr<OpenGymTupleSpace> space = CreateObject<OpenGymTupleSpace> ();
 
@@ -263,34 +269,29 @@ MyGymEnv::GetObservation ()
   Time delaySum = Seconds (0.0);
   uint32_t pktSum = 0;
 
-  NS_LOG_DEBUG ("m_interval: " << m_interval);
+  // NS_LOG_DEBUG ("m_interval: " << m_interval);
+  NS_LOG_DEBUG ("MyGetObservation:");
 
   uint32_t numAgents = m_agents.GetN ();
   for (uint32_t i = 0; i < numAgents; i++)
     {
       Ptr<Node> node = m_agents.Get (i);
 
-      NS_LOG_DEBUG ("# of pkts sent: " << m_agent_state[i]->m_txPktNum);
+      // NS_LOG_DEBUG ("# of pkts sent: " << m_agent_state[i]->m_txPktNum);
 
       // collect statistics
       // Throughput
-      double thpt = (m_agent_state[i]->m_txPktNum - m_agent_state[i]->m_txPktNumLastVal) / 1000.0;
+      double thpt = m_agent_state[i]->m_txPktNum - m_agent_state[i]->m_txPktNumLastVal;
       thpt /= 1000;
 
       // XXX moving average?
-      double avg_thpt = updateEwma (m_agent_state[i]->m_txPktNum, m_agent_state[i]->m_txPktNumLastVal, m_agent_state[i]->m_txPktNumMovingAverage, 0.9);
+      double avg_thpt =
+          updateEwma (m_agent_state[i]->m_txPktNum, m_agent_state[i]->m_txPktNumLastVal,
+                      m_agent_state[i]->m_txPktNumMovingAverage, 0.9);
       avg_thpt /= 1000;
 
       // Latency
-      double lat;
-      if (m_agent_state[i]->m_txPktNum > 0)
-        {
-          lat = (m_agent_state[i]->m_delaySum / m_agent_state[i]->m_txPktNum).GetDouble ();
-        }
-      else
-        {
-          lat = 0;
-        }
+      double lat = m_agent_state[i]->getAvgTxDelay ();
       lat /= 1e9; // latency unit: sec
 
       delaySum += m_agent_state[i]->m_delaySum;
@@ -301,6 +302,7 @@ MyGymEnv::GetObservation ()
       Ptr<WifiNetDevice> wifi_dev = DynamicCast<WifiNetDevice> (dev);
       Ptr<WifiRemoteStationManager> rman = wifi_dev->GetRemoteStationManager ();
       double err_rate = rman->GetAggInfo ().GetFrameErrorRate ();
+
       // CW
       Ptr<WifiMac> wifi_mac = wifi_dev->GetMac ();
       Ptr<RegularWifiMac> rmac = DynamicCast<RegularWifiMac> (wifi_mac);
@@ -317,6 +319,8 @@ MyGymEnv::GetObservation ()
       box->AddValue (err_rate);
       box->AddValue (mincw);
 
+      NS_LOG_DEBUG (thpt << ",\t" << avg_thpt << ",\t" << lat << ",\t" << err_rate << ",\t" << mincw);
+
       // agent_id
       // box->AddValue (i);
     }
@@ -328,7 +332,7 @@ MyGymEnv::GetObservation ()
   //     box->AddValue(value);
   // }
 
-  NS_LOG_DEBUG ("MyGetObservation: " << box);
+  // NS_LOG_DEBUG ("MyGetObservation: " << box);
   return box;
 }
 
@@ -338,24 +342,55 @@ MyGymEnv::GetReward ()
   NS_LOG_FUNCTION (this);
   const double epsilon = 5e-5;
   const double lower_bound = 0.1;
-  float reward = 0.0, reward_min = 0.0;
+  const double reward_scale = 1000.0;
+
+  float rate_reward = 0.0, rate_reward_min = 0.0;
+  float delay_reward = 0.0;
+  float loss_reward = 0.0;
+  float reward = 0.0;
+
   for (uint32_t i = 0; i < m_agents.GetN (); i++)
     {
-      double avg_rate =
-          updateEwma (m_agent_state[i]->m_rxPktNum, m_agent_state[i]->m_rxPktNumLastVal,
-                      m_agent_state[i]->m_rxPktNumMovingAverage, 0.9);
+      {
+        double avg_rate =
+            updateEwma (m_agent_state[i]->m_rxPktNum, m_agent_state[i]->m_rxPktNumLastVal,
+                        m_agent_state[i]->m_rxPktNumMovingAverage, 0.9);
 
-      // log(5e-5) ~= -10, this prevents logarithm from being minus infinity
-      reward += std::log (avg_rate + epsilon) / 1000.0;
+        // log(5e-5) ~= -10, this prevents logarithm from being minus infinity
+        rate_reward += std::log (avg_rate + epsilon);
 
-      // the moving average will be always bigger than 0.1
-      // reward += std::log ( std::max (avg_rate, lower_bound) ) / 1000.0;
+        // the moving average will be always bigger than 0.1
+        // rate_reward += std::log ( std::max (avg_rate, lower_bound) );
 
-      reward_min += std::log (lower_bound) / 1000.0;
+        rate_reward_min += std::log (lower_bound);
 
-      // reward += avg_rate / 1000.0;  // sum-rate reward function
+        // rate_reward += avg_rate / 1000.0;  // sum-rate reward function
+      }
+      {
+        double avg_lat = m_agent_state[i]->getAvgTxDelay ();
+        delay_reward += avg_lat / 1e9;  // seconds
+      }
+      {
+        // MYTODO should make this into function?
+        Ptr<Node> node = m_agents.Get (i);
+        Ptr<NetDevice> dev = node->GetDevice (0);
+        Ptr<WifiNetDevice> wifi_dev = DynamicCast<WifiNetDevice> (dev);
+        Ptr<WifiRemoteStationManager> rman = wifi_dev->GetRemoteStationManager ();
+        double err_rate = rman->GetAggInfo ().GetFrameErrorRate ();
+        loss_reward += err_rate;
+      }
     }
-  reward = std::max (reward, reward_min);
+  rate_reward = std::max (rate_reward, rate_reward_min);
+
+  // reward = rate_reward - 100 * delay_reward - 200 * loss_reward;
+  reward = rate_reward;
+
+  // MYTODO export this to ExtraInfo
+  NS_LOG_DEBUG ("rate_reward: " << rate_reward);
+  NS_LOG_DEBUG ("delay_reward: " << delay_reward);
+  NS_LOG_DEBUG ("loss_reward: " << loss_reward);
+
+  reward /= reward_scale;
   NS_LOG_DEBUG ("MyGetReward: " << reward);
   return reward;
 }

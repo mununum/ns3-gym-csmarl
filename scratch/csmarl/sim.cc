@@ -26,10 +26,10 @@ main (int argc, char *argv[])
   double simulationTime = 20; // seconds
   double envStepTime = 0.02; // seconds, ns3gym env step time interval
   uint32_t openGymPort = 5555;
-  bool debug = false;
+  bool debug = true;
 
   // OpenGym Env
-  bool opengymEnabled = true;
+  bool opengymEnabled = false;
   bool continuous = false;
 
   // Parameters of the scenario
@@ -66,9 +66,9 @@ main (int argc, char *argv[])
   cmd.AddValue ("topology", "Interference topology. [fc, fim, ...], Default: fim", topology);
   cmd.AddValue ("nFlows", "Number of flows. Default: 3", nFlows);
   cmd.AddValue ("distance", "Inter node distance. Default: 10m", distance);
-  cmd.AddValue ("opengymEnabled", "Using openAI gym or not. Default: true", opengymEnabled);
+  cmd.AddValue ("opengymEnabled", "Using openAI gym or not. Default: false", opengymEnabled);
   cmd.AddValue ("continuous", "Use continuous action space. Default: false", continuous);
-  cmd.AddValue ("debug", "Print debug message. Default: false", debug);
+  cmd.AddValue ("debug", "Print debug message. Default: true", debug);
   cmd.Parse (argc, argv);
 
   NS_LOG_UNCOND ("Ns3Env parameters:");
@@ -225,11 +225,16 @@ main (int argc, char *argv[])
 
       InetSocketAddress destAddress (dest_ip_addr, port);
       destAddress.SetTos (0x70); // AC_BE
+
       UdpClientHelper source (destAddress);
       source.SetAttribute ("MaxPackets", UintegerValue (pktPerSec * simulationTime));
       source.SetAttribute ("PacketSize", UintegerValue (payloadSize));
       Time interPacketInterval = Seconds (1.0 / pktPerSec);
       source.SetAttribute ("Interval", TimeValue (interPacketInterval)); // packets/s
+
+      // RandomAppHelper source ("ns3::UdpSocketFactory", InetSocketAddress (destAddress));
+      // source.SetAttribute ("Delay", StringValue ("ns3::ExponentialRandomVariable[Mean=" + std::to_string(1.0 / pktPerSec) + "]"));
+      // source.SetAttribute ("Size", StringValue ("ns3::ExponentialRandomVariable[Mean=" + std::to_string(payloadSize) + "][Bound=2000]"));
 
       ApplicationContainer newSourceApps = source.Install (srcNode);
       sourceApps.Add (newSourceApps);

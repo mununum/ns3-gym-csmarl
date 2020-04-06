@@ -32,6 +32,7 @@ class Ns3MultiAgentEnv(MultiAgentEnv):
                    "--stepTime": stepTime,
                    "--nFlows": self.n_agents,
                    "--topology": topology,
+                   "--opengymEnabled": True,
                    "--debug": self.debug}
 
         print("worker {} start".format(self.worker_index))
@@ -46,6 +47,8 @@ class Ns3MultiAgentEnv(MultiAgentEnv):
             low=self.multi_obs_space.low[0], high=self.multi_obs_space.high[0], dtype=self.multi_obs_space.dtype)
         self.action_space = self.multi_act_space.spaces[0]
 
+        self.info_list = ["rx_rate", "tx_rate_ewma", "latency", "loss_rate"]
+
     def obs_to_dict(self, obs):
         multi_obs = np.array(obs).reshape(self.multi_obs_space.shape)
         return {i: multi_obs[i] for i in range(self.n_agents)}
@@ -54,12 +57,19 @@ class Ns3MultiAgentEnv(MultiAgentEnv):
         return {int(kv.split('=')[0]): float(kv.split('=')[1])
                 for kv in info.split()}
 
-    def parse_info(self, info, state):
-        return {int(kv.split('=')[0]): {
-                    "r_ind": float(kv.split('=')[1]),
-                    "state": np.array(state),
-                }
-                for kv in info.split()}
+    def parse_info(self, info, obs, state):
+        ret = {}
+        for kv in info.split():
+            k, v = kv.split('=')
+            o = obs[int(k)]
+            ret[int(k)] = {
+                "state": np.array(state),  # for centralized critic
+                "rx_rate": float(v),
+                "tx_rate_ewma": o[1],
+                "latency": o[2],
+                "loss_rate": o[3],
+            }
+        return ret
 
     def reset(self):
         print("worker {} reset".format(self.worker_index))
@@ -77,7 +87,7 @@ class Ns3MultiAgentEnv(MultiAgentEnv):
         else:
             raise AssertionError
         done = {"__all__": d}
-        info = self.parse_info(i, state=o)
+        info = self.parse_info(i, obs, state=o)
         return obs, rew, done, info
 
     def close(self):
@@ -88,28 +98,33 @@ class Ns3MultiAgentEnv(MultiAgentEnv):
 def on_episode_start(info):
     episode = info["episode"]
     n_agents = info["env"].envs[0].n_agents
+    info_list = info["env"].envs[0].info_list
     for i in range(n_agents):
-        episode.user_data["r_ind_"+str(i)] = []
+        for info in info_list:
+            episode.user_data[info+"_"+str(i)] = []
 
 
 def on_episode_step(info):
     episode = info["episode"]
     n_agents = info["env"].envs[0].n_agents
+    info_list = info["env"].envs[0].info_list
     for i in range(n_agents):
-        if "r_ind" in episode.last_info_for(i):
-            episode.user_data["r_ind_"+str(i)].append(
-                episode.last_info_for(i)["r_ind"]
-            )
+        for info in info_list:
+            if info in episode.last_info_for(i):
+                episode.user_data[info+"_"+str(i)].append(
+                    episode.last_info_for(i)[info]
+                )
 
 
 def on_episode_end(info):
     episode = info["episode"]
-    r_ind_sum = {k: np.sum(v) for k, v in episode.user_data.items()}
-    r_total = 0
-    for k, v in r_ind_sum.items():
-        episode.custom_metrics[k] = v
-        r_total += v
-    episode.custom_metrics["r_total"] = r_total
+    for k, v in episode.user_data.items():
+        if "x_rate" in k:
+            agg = np.sum(v)
+        else:
+            # MYTODO np.mean is not technically correct at this point
+            agg = np.mean(v)
+        episode.custom_metrics[k] = agg
 
 
 if __name__ == "__main__":

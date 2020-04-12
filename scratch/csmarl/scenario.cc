@@ -60,4 +60,65 @@ ConfigureFIMTopology (Ptr<MultiModelSpectrumChannel> spectrumChannel, NodeContai
   spectrumChannel->AddPropagationLossModel (lossModel);
 }
 
+void
+ConfigureMatrixTopology (Ptr<MultiModelSpectrumChannel> spectrumChannel, NodeContainer &nodes,
+                         uint32_t nEdges, std::vector<std::tuple<uint32_t, uint32_t>> &edges)
+{
+  Ptr<MatrixPropagationLossModel> lossModel = CreateObject<MatrixPropagationLossModel> ();
+
+  for (uint32_t i = 0; i < nEdges; i++)
+    {
+      uint32_t a = std::get<0> (edges[i]);
+      uint32_t b = std::get<1> (edges[i]);
+
+      Ptr<MobilityModel> mobilityA = nodes.Get (a)->GetObject<MobilityModel> ();
+      Ptr<MobilityModel> mobilityB = nodes.Get (b)->GetObject<MobilityModel> ();
+
+      lossModel->SetLoss (mobilityA, mobilityB, 0);
+    }
+
+  spectrumChannel->AddPropagationLossModel (lossModel);
+}
+
+void
+ReadGraph (std::string topology, uint32_t &nNodes, uint32_t &nEdges, uint32_t &nFlows,
+           std::vector<std::tuple<float, float>> &pos,
+           std::vector<std::tuple<uint32_t, uint32_t>> &edges,
+           std::vector<std::tuple<uint32_t, uint32_t>> &flows)
+{
+  std::ifstream graph_file;
+  std::string graph_file_name = "scratch/csmarl/graphs/" + topology + ".txt";
+
+  graph_file.open (graph_file_name);
+  if (graph_file.fail ())
+    {
+      NS_FATAL_ERROR ("File " << graph_file_name << " not found");
+    }
+  while (!graph_file.eof ())
+    {
+      graph_file >> nNodes;
+      for (uint32_t i = 0; i < nNodes; i++)
+        {
+          float a, b;
+          graph_file >> a >> b;
+          pos.push_back (std::make_tuple (a, b));
+        }
+      graph_file >> nEdges;
+      for (uint32_t i = 0; i < nEdges; i++)
+        {
+          uint32_t a, b;
+          graph_file >> a >> b;
+          edges.push_back (std::make_tuple (a, b));
+        }
+      graph_file >> nFlows;
+      for (uint32_t i = 0; i < nFlows; i++)
+        {
+          uint32_t a, b;
+          graph_file >> a >> b;
+          flows.push_back (std::make_tuple (a, b));
+        }
+    }
+  graph_file.close ();
+}
+
 } // namespace ns3

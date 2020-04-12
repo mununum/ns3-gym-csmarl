@@ -15,6 +15,7 @@ from ray.rllib.utils import try_import_tf
 
 from ns3_multiagent_env import Ns3MultiAgentEnv, on_episode_start, on_episode_step, on_episode_end
 from ns3_centralized_critic import CCTrainer
+from graph import read_graph
 
 tf = try_import_tf()
 
@@ -33,7 +34,7 @@ class CentralizedCriticRNNModel(RecurrentTFModelV2):
                                                         model_config, name)
         self.cell_size = cell_size
 
-        self.n_agents_in_critic = model_config["custom_options"]["n_agents_in_critic"]
+        self.n_agents_in_critic = read_graph(model_config["custom_options"]["topology"])
         self.obs_dim = obs_space.shape[0]
         self.act_dim = self.num_outputs
         # MYTODO make proper mapping on agent_id
@@ -159,20 +160,19 @@ if __name__ == "__main__":
 
     # MYTODO: make it configurable
     cwd = os.path.dirname(os.path.abspath(__file__))
+    topology = "complex"
 
     ModelCatalog.register_custom_model(
         "cc_rnn_model", CentralizedCriticRNNModel)
 
     config_params = [0]
     env_config = {  # environment configuration
-        "n_agents": 3,
         "cwd": cwd,
         "debug": args.debug,
         "reward": "shared",
-        "topology": "fim",
+        "topology": topology,
+        "traffic": "cbr",
     }
-    if args.debug:
-        env_config["simTime"] = 1
     # config_params = [FILL]  # for env config testing
     # env_config = tune.grid_search(config_params)
 
@@ -193,6 +193,7 @@ if __name__ == "__main__":
         len(params_list) * len(config_params) * num_samples  # <= 32 is recommended
     num_gpus_per_worker = NUM_GPUS / num_workers_total
 
+    # MYTODO combine simulation codes
     tune.run(
         CCTrainer,
         stop={
@@ -214,7 +215,7 @@ if __name__ == "__main__":
                 "custom_model": "cc_rnn_model",
                 "max_seq_len": 20,
                 "custom_options": {
-                    "n_agents_in_critic": 3,  # n_agents in critic
+                    "topology": topology,
                 }
             },
             "callbacks": {

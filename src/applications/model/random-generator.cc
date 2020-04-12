@@ -18,9 +18,17 @@ RandomGenerator::GetTypeId (void)
     .SetParent<Application> ()
     .SetGroupName ("Applications")
     .AddConstructor<RandomGenerator> ()
-    .AddAttribute ("Delay", "The delay between two packets (s)",
+    .AddAttribute ("Delay1", "The delay1 between two packets (s)",
                     StringValue ("ns3::ConstantRandomVariable[Constant=1]"),
-                    MakePointerAccessor (&RandomGenerator::m_delay),
+                    MakePointerAccessor (&RandomGenerator::m_delay1),
+                    MakePointerChecker<RandomVariableStream> ())
+    .AddAttribute ("Delay2", "The delay2 between two packets (s)",
+                    StringValue ("ns3::ConstantRandomVariable[Constant=1]"),
+                    MakePointerAccessor (&RandomGenerator::m_delay2),
+                    MakePointerChecker<RandomVariableStream> ())
+    .AddAttribute ("ModDelay", "The transition time of the modulation process",
+                    StringValue ("ns3::ConstantRandomVariable[Constant=1]"),
+                    MakePointerAccessor (&RandomGenerator::m_modDelay),
                     MakePointerChecker<RandomVariableStream> ())
     .AddAttribute ("Size", "The size of each packet (bytes)",
                     StringValue ("ns3::ConstantRandomVariable[Constant=2000]"),
@@ -44,6 +52,9 @@ RandomGenerator::SetRemote (std::string socketType, Address remote)
 void
 RandomGenerator::StartApplication (void)
 {
+  m_mode = 1;
+  m_lastMod = Simulator::Now ();
+  m_sampledModDelay = Seconds (0.0);
   m_socket = Socket::CreateSocket (GetNode (), m_socketType);
   m_socket->Bind ();
   m_socket->ShutdownRecv ();
@@ -60,7 +71,23 @@ RandomGenerator::StopApplication (void)
 void
 RandomGenerator::DoGenerate (void)
 {
-  m_next = Simulator::Schedule (Seconds (m_delay->GetValue ()), &RandomGenerator::DoGenerate, this);
+  if ((Simulator::Now () - m_lastMod) >= m_sampledModDelay)
+    {
+      /* Switch mode */
+      m_mode = 3 - m_mode;  // 1->2, 2->1
+      m_sampledModDelay = Seconds (m_modDelay->GetValue ());
+      m_lastMod = Simulator::Now ();
+    }
+
+  /* Packet delay sampling */
+  Time delay;
+  NS_ASSERT (m_mode == 1 || m_mode == 2);
+  if (m_mode == 1)
+    delay = Seconds (m_delay1->GetValue ());
+  else if (m_mode == 2)
+    delay = Seconds (m_delay2->GetValue ());
+  
+  m_next = Simulator::Schedule (delay, &RandomGenerator::DoGenerate, this);
   uint32_t size;
   const uint32_t size_lb = 20;
   while (1)

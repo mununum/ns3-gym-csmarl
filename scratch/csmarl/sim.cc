@@ -34,8 +34,7 @@ main (int argc, char *argv[])
 
   // Parameters of the scenario
   std::string topology = "fim";
-  uint32_t nFlows = 3;
-  double distance = 10.0;
+  std::string traffic = "cbr";
   bool noErrors = false;
   std::string errorModelType = "ns3::NistErrorRateModel";
   // bool enableFading = true;
@@ -62,13 +61,11 @@ main (int argc, char *argv[])
   // optional parameters
   cmd.AddValue ("simTime", "Simulation time in seconds, Default: 20s", simulationTime);
   cmd.AddValue ("stepTime", "Step time of the environment, Default: 0.02s", envStepTime);
-  // MYTODO add topologies
-  cmd.AddValue ("topology", "Interference topology. [fc, fim, ...], Default: fim", topology);
-  cmd.AddValue ("nFlows", "Number of flows. Default: 3", nFlows);
-  cmd.AddValue ("distance", "Inter node distance. Default: 10m", distance);
+  cmd.AddValue ("topology", "Interference topology. (on graph file), Default: fim", topology);
   cmd.AddValue ("opengymEnabled", "Using openAI gym or not. Default: false", opengymEnabled);
   cmd.AddValue ("continuous", "Use continuous action space. Default: false", continuous);
   cmd.AddValue ("debug", "Print debug message. Default: true", debug);
+  cmd.AddValue ("traffic", "Traffic type (cbr|mmpp). Default: cbr", traffic);
   cmd.Parse (argc, argv);
 
   NS_LOG_UNCOND ("Ns3Env parameters:");
@@ -76,7 +73,6 @@ main (int argc, char *argv[])
   NS_LOG_UNCOND ("--openGymPort: " << openGymPort);
   NS_LOG_UNCOND ("--envStepTime: " << envStepTime);
   NS_LOG_UNCOND ("--seed: " << simSeed);
-  NS_LOG_UNCOND ("--distance: " << distance);
 
   if (debug)
     {
@@ -93,11 +89,20 @@ main (int argc, char *argv[])
   RngSeedManager::SetSeed (1);
   RngSeedManager::SetRun (simSeed);
 
+  // open graph file
+  uint32_t nNodes, nEdges, nFlows;
+  std::vector<std::tuple<float, float>> pos;
+  std::vector<std::tuple<uint32_t, uint32_t>> edges;
+  std::vector<std::tuple<uint32_t, uint32_t>> flows;
+
+  // read a graph file and assign values to nNodes, nEdges, nFlows
+  // pos, edges, flows
+  ReadGraph (topology, nNodes, nEdges, nFlows, pos, edges, flows);
+
   // Configuration of the scenario
   // Create Nodes
-  uint32_t nodeNum = nFlows * 2;
   NodeContainer nodes;
-  nodes.Create (nodeNum);
+  nodes.Create (nNodes);
 
   // WiFi device
   WifiHelper wifi;
@@ -105,17 +110,10 @@ main (int argc, char *argv[])
 
   // Mobility model
   MobilityHelper mobility;
-  // mobility.SetPositionAllocator ("ns3::GridPositionAllocator", "MinX", DoubleValue (0.0), "MinY",
-  //                                DoubleValue (0.0), "DeltaX", DoubleValue (distance), "DeltaY",
-  //                                DoubleValue (distance), "GridWidth",
-  //                                UintegerValue (2), // will create FIM topology
-  //                                "LayoutType", StringValue ("RowFirst"));
   Ptr<ListPositionAllocator> positionAlloc = CreateObject<ListPositionAllocator> ();
-  for (uint32_t i = 0; i < nFlows; i++)
+  for (uint32_t i = 0; i < nNodes; i++)
     {
-      // The nodes will be overlapped
-      positionAlloc->Add (Vector (0.0, 0.0, 0.0));
-      positionAlloc->Add (Vector (5.0, 0.0, 0.0));
+      positionAlloc->Add (Vector (std::get<0> (pos[i]), std::get<1> (pos[i]), 0.0));
     }
   mobility.SetPositionAllocator (positionAlloc);
 
@@ -137,27 +135,21 @@ main (int argc, char *argv[])
   Config::SetDefault ("ns3::WifiPhy::ChannelWidth", UintegerValue (5));
 
   // Channel
-  // Ptr<FriisPropagationLossModel> lossModel = CreateObject<FriisPropagationLossModel> ();
-  // Ptr<NakagamiPropagationLossModel> fadingModel = CreateObject<NakagamiPropagationLossModel> ();
-  // if (enableFading)
-  //   {
-  //     lossModel->SetNext (fadingModel);
-  //   }
-  // spectrumChannel->AddPropagationLossModel (lossModel);
 
-  if (topology == "fc")
-    {
-      ConfigureFCTopology (spectrumChannel, nodes);
-    }
-  else if (topology == "fim")
-    {
-      ConfigureFIMTopology (spectrumChannel, nodes);
-    }
-  else
-    {
-      NS_LOG_ERROR ("invalid topology configuration");
-      exit (1);
-    }
+  // if (topology == "fc")
+  //   {
+  //     ConfigureFCTopology (spectrumChannel, nodes);
+  //   }
+  // else if (topology == "fim")
+  //   {
+  //     ConfigureFIMTopology (spectrumChannel, nodes);
+  //   }
+  // else
+  //   {
+  //     NS_FATAL_ERROR ("invalid topology configuration");
+  //   }
+
+  ConfigureMatrixTopology (spectrumChannel, nodes, nEdges, edges);
 
   Ptr<ConstantSpeedPropagationDelayModel> delayModel =
       CreateObject<ConstantSpeedPropagationDelayModel> ();
@@ -197,52 +189,68 @@ main (int argc, char *argv[])
 
   // Configure routing (no need right now)
 
-  // Traffic
-  // Create a BulkSendApplication and install it on node 0
-  // Ptr<UniformRandomVariable> startTimeRng = CreateObject<UniformRandomVariable> ();
-  // startTimeRng->SetAttribute ("Min", DoubleValue (0.0));
-  // startTimeRng->SetAttribute ("Max", DoubleValue (1.0));
-
-  // Send a UDP trafic from even --> odd
-
   uint16_t port = 1000;
-  // uint32_t srcNodeId = 0;
-  // uint32_t destNodeId = 1;
-  NodeContainer agents;
+  NodeContainer srcNodes;
+  NodeContainer sinkNodes;
   ApplicationContainer sourceApps;
   ApplicationContainer sinkApps;
-  for (uint32_t srcNodeId = 0; srcNodeId < nodeNum; srcNodeId += 2)
+  for (uint32_t i = 0; i < nFlows; i++)
     {
-      uint32_t destNodeId = srcNodeId + 1;
+      uint32_t srcNodeId = std::get<0> (flows[i]);
+      uint32_t sinkNodeId = std::get<1> (flows[i]);
+
       Ptr<Node> srcNode = nodes.Get (srcNodeId);
-      Ptr<Node> dstNode = nodes.Get (destNodeId);
+      Ptr<Node> sinkNode = nodes.Get (sinkNodeId);
 
-      agents.Add (srcNode);
+      srcNodes.Add (srcNode);
 
-      Ptr<Ipv4> destIpv4 = dstNode->GetObject<Ipv4> ();
+      Ptr<Ipv4> destIpv4 = sinkNode->GetObject<Ipv4> ();
       Ipv4InterfaceAddress dest_ipv4_int_addr = destIpv4->GetAddress (1, 0);
       Ipv4Address dest_ip_addr = dest_ipv4_int_addr.GetLocal ();
 
       InetSocketAddress destAddress (dest_ip_addr, port);
       destAddress.SetTos (0x70); // AC_BE
 
-      UdpClientHelper source (destAddress);
-      source.SetAttribute ("MaxPackets", UintegerValue (pktPerSec * simulationTime));
-      source.SetAttribute ("PacketSize", UintegerValue (payloadSize));
-      Time interPacketInterval = Seconds (1.0 / pktPerSec);
-      source.SetAttribute ("Interval", TimeValue (interPacketInterval)); // packets/s
+      if (traffic == "cbr")
+        {
+          UdpClientHelper source (destAddress);
+          source.SetAttribute ("MaxPackets", UintegerValue (pktPerSec * simulationTime));
+          source.SetAttribute ("PacketSize", UintegerValue (payloadSize));
+          Time interPacketInterval = Seconds (1.0 / pktPerSec);
+          source.SetAttribute ("Interval", TimeValue (interPacketInterval)); // packets/s
+          ApplicationContainer newSourceApps = source.Install (srcNode);
+          sourceApps.Add (newSourceApps);
+        }
+      else if (traffic == "mmpp")
+        {
+          // MMPP
+          RandomAppHelper source ("ns3::UdpSocketFactory", InetSocketAddress (destAddress));
+          source.SetAttribute ("Delay1",
+                               StringValue ("ns3::ExponentialRandomVariable[Mean=" +
+                                            std::to_string (1.0 / pktPerSec) + "]")); // 0.001
+          source.SetAttribute ("Delay2",
+                               StringValue ("ns3::ExponentialRandomVariable[Mean=" +
+                                            std::to_string (1.0 / pktPerSec * 10) + "]")); // 0.01
+          source.SetAttribute ("ModDelay", StringValue ("ns3::ExponentialRandomVariable[Mean=" +
+                                                        std::to_string (0.5) + "]"));
+          source.SetAttribute ("Size", StringValue ("ns3::ExponentialRandomVariable[Mean=" +
+                                                    std::to_string (payloadSize) + "|Bound=2000]"));
+          ApplicationContainer newSourceApps = source.Install (srcNode);
+          sourceApps.Add (newSourceApps);
+        }
+      else
+        {
+          NS_FATAL_ERROR ("traffic must be (cbr|mmpp)");
+        }
 
-      // RandomAppHelper source ("ns3::UdpSocketFactory", InetSocketAddress (destAddress));
-      // source.SetAttribute ("Delay", StringValue ("ns3::ExponentialRandomVariable[Mean=" + std::to_string(1.0 / pktPerSec) + "]"));
-      // source.SetAttribute ("Size", StringValue ("ns3::ExponentialRandomVariable[Mean=" + std::to_string(payloadSize) + "][Bound=2000]"));
-
-      ApplicationContainer newSourceApps = source.Install (srcNode);
-      sourceApps.Add (newSourceApps);
-
-      // Create a packet sink to receive these packets
-      UdpServerHelper sink (port);
-      ApplicationContainer newSinkApps = sink.Install (dstNode);
-      sinkApps.Add (newSinkApps);
+      if (!sinkNodes.Contains (sinkNode->GetId ()))
+        {
+          // Create a packet sink to receive these packets
+          UdpServerHelper sink (port);
+          ApplicationContainer newSinkApps = sink.Install (sinkNode);
+          sinkApps.Add (newSinkApps);
+          sinkNodes.Add (sinkNode);
+        }
     }
 
   sourceApps.Start (Seconds (0.0));
@@ -252,39 +260,25 @@ main (int argc, char *argv[])
 
   // Print node positions
   NS_LOG_UNCOND ("Node Positions:");
-  for (uint32_t i = 0; i < nodes.GetN (); i++)
+  for (NodeContainer::Iterator i = nodes.Begin (); i != nodes.End (); i++)
     {
-      Ptr<Node> node = nodes.Get (i);
+      Ptr<Node> node = *i;
       Ptr<MobilityModel> mobility = node->GetObject<MobilityModel> ();
       NS_LOG_UNCOND ("---Node ID: " << node->GetId ()
                                     << " Positions: " << mobility->GetPosition ());
     }
 
-  // Ptr<NodeContainer> agents = CreateObject<NodeContainer> ();
-
   // Configure OpenGym environment
   Ptr<OpenGymInterface> openGymInterface = CreateObject<OpenGymInterface> (openGymPort);
-  Ptr<MyGymEnv> myGymEnv =
-      CreateObject<MyGymEnv> (agents, Seconds (simulationTime), Seconds (envStepTime),
-                              opengymEnabled, continuous);
+  Ptr<MyGymEnv> myGymEnv = CreateObject<MyGymEnv> (
+      srcNodes, Seconds (simulationTime), Seconds (envStepTime), opengymEnabled, continuous);
 
   myGymEnv->SetOpenGymInterface (openGymInterface);
-
-  // connect OpenGym entity to RX event source
-
-  for (uint32_t i = 0; i < nFlows; i++)
-    {
-      Ptr<UdpServer> udpServer = DynamicCast<UdpServer> (sinkApps.Get (i));
-      Ptr<Node> dstNode = nodes.Get (i * 2 + 1);
-      udpServer->TraceConnectWithoutContext (
-          "Rx", MakeBoundCallback (&MyGymEnv::CountRxPkts, myGymEnv, dstNode, i));
-    }
-  // udpServer->TraceConnectWithoutContext ("Rx", MakeCallback (&DestRxPkt));
 
   // connect TxOkHeader trace source
   for (uint32_t i = 0; i < nFlows; i++)
     {
-      Ptr<Node> node = agents.Get (i);
+      Ptr<Node> node = srcNodes.Get (i);
       Ptr<NetDevice> dev = node->GetDevice (0);
       Ptr<WifiNetDevice> wifi_dev = DynamicCast<WifiNetDevice> (dev);
       Ptr<WifiMac> wifi_mac = wifi_dev->GetMac ();
@@ -301,7 +295,6 @@ main (int argc, char *argv[])
   NS_LOG_UNCOND ("Simulation stop");
 
   // NS_LOG_UNCOND (myGymEnv->GetTotalPkt ());
-  std::cout << myGymEnv->GetTotalPkt () << std::endl;
 
   openGymInterface->NotifySimulationEnd ();
 

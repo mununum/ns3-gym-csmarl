@@ -19,6 +19,7 @@ from ray.rllib.utils.tf_ops import make_tf_callable
 from ray.rllib.utils import try_import_tf
 
 from ns3_multiagent_env import Ns3MultiAgentEnv, on_episode_start, on_episode_step, on_episode_end
+from graph import read_graph
 
 tf = try_import_tf()
 
@@ -46,7 +47,7 @@ class CentralizedCriticModel(TFModelV2):
             obs_space, action_space, num_outputs, model_config, name)
         self.register_variables(self.model.variables())
 
-        self.n_agents_in_critic = model_config["custom_options"]["n_agents_in_critic"]
+        self.n_agents_in_critic = read_graph(model_config["custom_options"]["topology"])
 
         # Value network
         # Central VF maps (obs, other_obs, other_act, agent_id) -> vf_pred
@@ -115,7 +116,7 @@ def centralized_critic_postprocessing(policy,
                                       other_agent_batches=None,  # batches from other agents
                                       episode=None):
 
-    n_agents_in_critic = policy.model.model_config["custom_options"]["n_agents_in_critic"]
+    n_agents_in_critic = policy.model.n_agents_in_critic
 
     if policy.loss_initialized():
         assert sample_batch["dones"][-1], "Not implemented for train_batch_mode=truncate_episodes"
@@ -131,7 +132,7 @@ def centralized_critic_postprocessing(policy,
         # print(sample_batch[SampleBatch.INFOS])
         # print(sample_batch[SampleBatch.INFOS].shape)
         sample_batch[STATE] = np.array(
-            [i["state"] for i in sample_batch[SampleBatch.INFOS]],
+            [i["common"]["state"] for i in sample_batch[SampleBatch.INFOS]],
             dtype=np.float32
         ) # (T, 12)
 
@@ -305,6 +306,7 @@ if __name__ == "__main__":
 
     # MYTODO: make it configurable
     cwd = os.path.dirname(os.path.abspath(__file__))
+    topology = "fim"
 
     ModelCatalog.register_custom_model("cc_model", CentralizedCriticModel)
     tune.run(
@@ -317,18 +319,18 @@ if __name__ == "__main__":
             "batch_mode": "complete_episodes",
             "log_level": "DEBUG" if args.debug else "WARN",
             "env_config": {
-                "n_agents": 3,  # environment configuration
                 "cwd": cwd,
                 "debug": args.debug,
                 "reward": "shared",
-                "topology": "fim",
+                "topology": topology,
+                "traffic": "cbr",
             },
             "num_workers": 0 if args.debug else 16,
             "use_gae": False,
             "model": {
                 "custom_model": "cc_model",
                 "custom_options": {
-                    "n_agents_in_critic": 3,  # n_agents in critic
+                    "topology": topology,
                 }
             },
             "callbacks": {

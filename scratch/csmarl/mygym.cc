@@ -38,10 +38,10 @@ public:
   MyGymNodeState ()
       : m_txPktNum (0),
         m_txPktNumLastVal (0),
-        m_rxPktNum (0),
-        m_rxPktNumLastVal (0),
+        // m_rxPktNum (0),
+        // m_rxPktNumLastVal (0),
         m_txPktNumMovingAverage (0.0),
-        m_rxPktNumMovingAverage (0.0),
+        // m_rxPktNumMovingAverage (0.0),
         m_delaySum (Seconds (0.0)),
         m_delay_estimator (CreateObject<DelayJitterEstimation> ())
   {
@@ -50,8 +50,9 @@ public:
   void
   Reset ()
   {
+    updateEwma (m_txPktNum, m_txPktNumLastVal, m_txPktNumMovingAverage, 0.9);
     m_txPktNumLastVal = m_txPktNum;
-    m_rxPktNumLastVal = m_rxPktNum;
+    // m_rxPktNumLastVal = m_rxPktNum;
     m_delaySum = Seconds (0.0);
   }
 
@@ -66,11 +67,11 @@ private:
   uint64_t m_txPktNum;
   uint64_t m_txPktNumLastVal;
 
-  uint64_t m_rxPktNum;
-  uint64_t m_rxPktNumLastVal;
+  // uint64_t m_rxPktNum;
+  // uint64_t m_rxPktNumLastVal;
 
   double m_txPktNumMovingAverage;
-  double m_rxPktNumMovingAverage;
+  // double m_rxPktNumMovingAverage;
 
   Time m_delaySum;
   Ptr<DelayJitterEstimation> m_delay_estimator;
@@ -166,7 +167,8 @@ MyGymEnv::GetTotalPkt ()
   uint32_t rxPktSum = 0;
   for (uint32_t i = 0; i < numAgents; i++)
     {
-      rxPktSum += m_agent_state[i]->m_rxPktNum;
+      rxPktSum += m_agent_state[i]->m_txPktNum;
+      // rxPktSum += m_agent_state[i]->m_rxPktNum;
       // std::cout << "link " << i << " sent " << m_agent_state[i]->m_rxPktNum << " packets in "
       //           << m_simTime << std::endl;
     }
@@ -263,14 +265,12 @@ Ptr<OpenGymDataContainer>
 MyGymEnv::GetObservation ()
 {
   NS_LOG_FUNCTION (this);
-  // uint32_t nodeNum = NodeList::GetNNodes ();
   Ptr<OpenGymBoxContainer<float>> box = CreateObject<OpenGymBoxContainer<float>> (m_obs_shape);
 
   Time delaySum = Seconds (0.0);
   uint32_t pktSum = 0;
 
-  // NS_LOG_DEBUG ("m_interval: " << m_interval);
-  NS_LOG_DEBUG ("MyGetObservation:");
+  NS_LOG_DEBUG (Simulator::Now () << " MyGetObservation:");
 
   uint32_t numAgents = m_agents.GetN ();
   for (uint32_t i = 0; i < numAgents; i++)
@@ -285,9 +285,10 @@ MyGymEnv::GetObservation ()
       thpt /= 1000;
 
       // XXX moving average?
-      double avg_thpt =
-          updateEwma (m_agent_state[i]->m_txPktNum, m_agent_state[i]->m_txPktNumLastVal,
-                      m_agent_state[i]->m_txPktNumMovingAverage, 0.9);
+      // double avg_thpt =
+      //     updateEwma (m_agent_state[i]->m_txPktNum, m_agent_state[i]->m_txPktNumLastVal,
+      //                 m_agent_state[i]->m_txPktNumMovingAverage, 0.9);
+      double avg_thpt = m_agent_state[i]->m_txPktNumMovingAverage;
       avg_thpt /= 1000;
 
       // Latency
@@ -352,9 +353,10 @@ MyGymEnv::GetReward ()
   for (uint32_t i = 0; i < m_agents.GetN (); i++)
     {
       {
-        double avg_rate =
-            updateEwma (m_agent_state[i]->m_rxPktNum, m_agent_state[i]->m_rxPktNumLastVal,
-                        m_agent_state[i]->m_rxPktNumMovingAverage, 0.9);
+        // double avg_rate =
+        //     updateEwma (m_agent_state[i]->m_rxPktNum, m_agent_state[i]->m_rxPktNumLastVal,
+        //                 m_agent_state[i]->m_rxPktNumMovingAverage, 0.9);
+        double avg_rate = m_agent_state[i]->m_txPktNumMovingAverage;
 
         // log(5e-5) ~= -10, this prevents logarithm from being minus infinity
         rate_reward += std::log (avg_rate + epsilon);
@@ -383,11 +385,14 @@ MyGymEnv::GetReward ()
   rate_reward = std::max (rate_reward, rate_reward_min);
 
   // reward = rate_reward - 100 * delay_reward - 200 * loss_reward;
+  // reward = rate_reward - 100 * delay_reward;
   reward = rate_reward;
+  m_rate_reward = rate_reward;
+  m_delay_reward = delay_reward;
 
-  // MYTODO export this to ExtraInfo
   NS_LOG_DEBUG ("rate_reward: " << rate_reward);
   NS_LOG_DEBUG ("delay_reward: " << delay_reward);
+  // MYTODO export this to ExtraInfo
   NS_LOG_DEBUG ("loss_reward: " << loss_reward);
 
   reward /= reward_scale;
@@ -401,14 +406,17 @@ MyGymEnv::GetExtraInfo ()
   NS_LOG_FUNCTION (this);
   std::string myInfo = "";
 
-  for (uint32_t i = 0; i < m_agents.GetN (); i++)
-    {
-      myInfo += std::to_string (i);
-      myInfo += "=";
-      myInfo += std::to_string (
-          (float) (m_agent_state[i]->m_rxPktNum - m_agent_state[i]->m_rxPktNumLastVal) / 1000.0);
-      myInfo += " ";
-    }
+  // for (uint32_t i = 0; i < m_agents.GetN (); i++)
+  //   {
+  //     myInfo += std::to_string (i);
+  //     myInfo += "=";
+  //     myInfo += std::to_string (
+  //         (float) (m_agent_state[i]->m_rxPktNum - m_agent_state[i]->m_rxPktNumLastVal) / 1000.0);
+  //     myInfo += " ";
+  //   }
+  
+  myInfo += "rate_reward=" + std::to_string (m_rate_reward) + " ";
+  myInfo += "delay_reward=" + std::to_string (m_delay_reward);
 
   NS_LOG_DEBUG ("MyGetExtraInfo: " << myInfo);
   return myInfo;
@@ -530,7 +538,7 @@ MyGymEnv::CountRxPkts (Ptr<MyGymEnv> entity, Ptr<Node> node, uint32_t idx, Ptr<c
 {
   // NS_LOG_DEBUG ("Client received a packet of " << packet->GetSize () << " bytes");
   // entity->m_currentNode = node;
-  entity->m_agent_state[idx]->m_rxPktNum++;
+  // entity->m_agent_state[idx]->m_rxPktNum++;
   // entity->m_rxPktNum++;
 
   // entity->m_delay_estimator->RecordRx (packet);

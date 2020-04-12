@@ -102,6 +102,7 @@ if __name__ == "__main__":
     ModelCatalog.register_custom_model("rnn", MyKerasRNN)
 
     cwd = os.path.dirname(os.path.abspath(__file__))
+    topology = "complex"
 
     NUM_GPUS = 4
     num_workers = 16
@@ -127,11 +128,11 @@ if __name__ == "__main__":
             "batch_mode": "complete_episodes",
             "log_level": "DEBUG" if args.debug else "WARN",
             "env_config": {
-                "n_agents": 3,
                 "cwd": cwd,
                 "debug": args.debug,
                 "reward": "shared",
-                "topology": "fim",
+                "topology": topology,
+                "traffic": "cbr",
             },
             "num_workers": 0 if args.debug else num_workers,
             "num_gpus_per_worker": num_gpus_per_worker,

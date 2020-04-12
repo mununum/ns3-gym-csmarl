@@ -65,13 +65,17 @@ main (int argc, char *argv[])
   InetSocketAddress destAddress (dest_ip_addr, port);
   destAddress.SetTos (0x70);
 
-  double delay = 1.0;
+  double delay1 = 0.01;
+  double delay2 = 0.001;
+  double modDelay = 0.5;
   uint32_t size = 1000;
   RandomAppHelper app ("ns3::UdpSocketFactory", InetSocketAddress (destAddress));
   // app.SetAttribute ("Delay", StringValue ("ns3::ExponentialRandomVariable[Mean=1.0]"));
   // app.SetAttribute ("Size", StringValue ("ns3::ExponentialRandomVariable[Mean=1000][Bound=2000]"));
-  app.SetAttribute ("Delay", StringValue ("ns3::ExponentialRandomVariable[Mean=" + std::to_string(delay) + "]"));
-  app.SetAttribute ("Size", StringValue ("ns3::ExponentialRandomVariable[Mean=" + std::to_string(size) + "][Bound=2000]"));
+  app.SetAttribute ("Delay1", StringValue ("ns3::ExponentialRandomVariable[Mean=" + std::to_string(delay1) + "]"));
+  app.SetAttribute ("Delay2", StringValue ("ns3::ExponentialRandomVariable[Mean=" + std::to_string(delay2) + "]"));
+  app.SetAttribute ("ModDelay", StringValue ("ns3::ExponentialRandomVariable[Mean=" + std::to_string(modDelay) + "]"));
+  app.SetAttribute ("Size", StringValue ("ns3::ExponentialRandomVariable[Mean=" + std::to_string(size) + "|Bound=2000]"));
   app.Install (nodes.Get (0));
 
   UdpServerHelper sink (port);

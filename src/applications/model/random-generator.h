@@ -28,7 +28,14 @@ private:
   TypeId m_socketType;
   Address m_peerAddress;
 
-  Ptr<RandomVariableStream> m_delay;
+  Time m_lastMod;
+  Time m_sampledModDelay;
+
+  uint8_t m_mode;
+  Ptr<RandomVariableStream> m_delay1;
+  Ptr<RandomVariableStream> m_delay2;
+  Ptr<RandomVariableStream> m_modDelay;
+
   Ptr<RandomVariableStream> m_size;
   Ptr<Socket> m_socket;
   EventId m_next;

@@ -62,6 +62,10 @@ private:
   bool m_enabled;
   bool m_continuous;
 
+  float m_rate_reward;
+  float m_delay_reward;
+  // float m_loss_reward;
+
   uint32_t m_perAgentObsDim;
 };
 

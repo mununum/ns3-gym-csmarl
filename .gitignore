@@ -44,3 +44,4 @@ build/
 *_pb2.py
 *_pb3.py
 .vscode/*
+scratch/csmarl/out

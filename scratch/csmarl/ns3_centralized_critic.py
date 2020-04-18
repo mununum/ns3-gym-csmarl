@@ -47,7 +47,8 @@ class CentralizedCriticModel(TFModelV2):
             obs_space, action_space, num_outputs, model_config, name)
         self.register_variables(self.model.variables())
 
-        self.n_agents_in_critic = read_graph(model_config["custom_options"]["topology"])
+        _, flows = read_graph(model_config["custom_options"]["topology"])
+        self.n_agents_in_critic = len(flows)
 
         # Value network
         # Central VF maps (obs, other_obs, other_act, agent_id) -> vf_pred
@@ -315,7 +316,7 @@ if __name__ == "__main__":
             "timesteps_total": args.stop,
         },
         config={
-            "env": Ns3MultiAgentEnv,
+            "env": "ns3_multiagent_env"",
             "batch_mode": "complete_episodes",
             "log_level": "DEBUG" if args.debug else "WARN",
             "env_config": {

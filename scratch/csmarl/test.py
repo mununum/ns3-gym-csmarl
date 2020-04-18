@@ -24,13 +24,14 @@ startSim = bool(args.start)
 iterationNum = int(args.iterations)
 
 port = 5555
-simTime = 10 # seconds
-stepTime = 0.1  # seconds
+simTime = 60 # seconds
+stepTime = 0.02  # seconds
 seed = 0
 simArgs = {"--simTime": simTime,
            "--stepTime": stepTime,
-           "--topology": "fc",
-           "--nFlows": 3}
+           "--topology": "complex",
+           "--opengymEnabled": True,
+           "--fixedFlow": True}
 debug = False
 
 env = ns3env.Ns3Env(port=port, stepTime=stepTime, startSim=startSim, simSeed=seed, simArgs=simArgs, debug=debug)
@@ -40,13 +41,13 @@ env.reset()
 
 ob_space = env.observation_space
 ac_space = env.action_space
-print("Observation space: ", ob_space,  ob_space.dtype)
-print("Action space: ", ac_space, ac_space.dtype)
+# print("Observation space: ", ob_space,  ob_space.dtype)
+# print("Action space: ", ac_space, ac_space.dtype)
 
 stepIdx = 0
 currIt = 0
 
-reward_sum = [0, 0, 0]
+# reward_sum = [0, 0, 0]
 
 try:
     while True:
@@ -62,9 +63,9 @@ try:
 
             # print("Step: ", stepIdx)
             obs, reward, done, info = env.step(action)
-            info_dict = {int(kv.split('=')[0]): float(kv.split('=')[1]) for kv in info.split()}
-            for k, v in info_dict.items():
-                reward_sum[k] += v * 1000
+            # info_dict = {int(kv.split('=')[0]): float(kv.split('=')[1]) for kv in info.split()}
+            # for k, v in info_dict.items():
+            #     reward_sum[k] += v * 1000
 
             # print("---obs, reward, done, info: ", obs, reward, done, info)
 
@@ -78,7 +79,7 @@ try:
         if currIt == iterationNum:
             break
 
-    print(reward_sum)
+    # print(reward_sum)
 
 except KeyboardInterrupt:
     print("Ctrl-C -> Exit")

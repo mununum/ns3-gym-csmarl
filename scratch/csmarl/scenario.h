@@ -13,6 +13,10 @@ void ReadGraph (std::string topology, uint32_t &nNodes, uint32_t &nEdges, uint32
                 std::vector<std::tuple<float, float>> &pos,
                 std::vector<std::tuple<uint32_t, uint32_t>> &edges,
                 std::vector<std::tuple<uint32_t, uint32_t>> &flows);
+void MakeFlows (uint32_t nNodes, uint32_t nEdges, uint32_t nFlows,
+                std::vector<std::tuple<uint32_t, uint32_t>> edges,
+                std::vector<std::tuple<uint32_t, uint32_t>> &flows,
+                uint32_t seed);
 
 } // namespace ns3
 

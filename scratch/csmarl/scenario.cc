@@ -1,3 +1,5 @@
+#include <random>
+#include <algorithm>
 #include "scenario.h"
 
 namespace ns3 {
@@ -94,31 +96,93 @@ ReadGraph (std::string topology, uint32_t &nNodes, uint32_t &nEdges, uint32_t &n
     {
       NS_FATAL_ERROR ("File " << graph_file_name << " not found");
     }
-  while (!graph_file.eof ())
+  graph_file >> nNodes;
+  for (uint32_t i = 0; i < nNodes; i++)
     {
-      graph_file >> nNodes;
-      for (uint32_t i = 0; i < nNodes; i++)
-        {
-          float a, b;
-          graph_file >> a >> b;
-          pos.push_back (std::make_tuple (a, b));
-        }
-      graph_file >> nEdges;
-      for (uint32_t i = 0; i < nEdges; i++)
-        {
-          uint32_t a, b;
-          graph_file >> a >> b;
-          edges.push_back (std::make_tuple (a, b));
-        }
-      graph_file >> nFlows;
-      for (uint32_t i = 0; i < nFlows; i++)
-        {
-          uint32_t a, b;
-          graph_file >> a >> b;
-          flows.push_back (std::make_tuple (a, b));
-        }
+      float a, b;
+      graph_file >> a >> b;
+      pos.push_back (std::make_tuple (a, b));
+    }
+  graph_file >> nEdges;
+  for (uint32_t i = 0; i < nEdges; i++)
+    {
+      uint32_t a, b;
+      graph_file >> a >> b;
+      edges.push_back (std::make_tuple (a, b));
+    }
+  graph_file >> nFlows;
+  for (uint32_t i = 0; i < nFlows; i++)
+    {
+      uint32_t a, b;
+      graph_file >> a >> b;
+      flows.push_back (std::make_tuple (a, b));
     }
   graph_file.close ();
+}
+
+void
+MakeFlows (uint32_t nNodes, uint32_t nEdges, uint32_t nFlows,
+           std::vector<std::tuple<uint32_t, uint32_t>> edges,
+           std::vector<std::tuple<uint32_t, uint32_t>> &flows, uint32_t seed)
+{
+
+  std::map<uint32_t, std::vector<uint32_t>> neighbors;
+  std::vector<uint32_t> nodes;
+
+  for (uint32_t i = 0; i < nEdges; i++)
+    {
+      uint32_t a, b;
+      a = std::get<0> (edges[i]);
+      b = std::get<1> (edges[i]);
+      neighbors[a].push_back (b);
+      neighbors[b].push_back (a);
+    }
+
+  for (uint32_t i = 0; i < nNodes; i++)
+    {
+      nodes.push_back (i);
+      // std::cout << i << ": ";
+      // for (std::vector<uint32_t>::iterator j = neighbors[i].begin (); j != neighbors[i].end (); j++)
+      //   {
+      //     std::cout << (*j) << " ";
+      //   }
+      // std::cout << std::endl;
+    }
+
+  std::random_device rd;
+  std::mt19937 g (rd ());
+  g.seed (seed);
+  std::shuffle (nodes.begin (), nodes.end (), g);
+
+  // for (uint32_t i = 0; i < nFlows; i++)
+  //   {
+  //     std::cout << std::get<0> (flows[i]) << " " << std::get<1> (flows[i]) << std::endl;
+  //   }
+
+  // flows will be overwritten
+  flows.clear ();
+
+  // randomly choose the flows
+  // std::cout << "MakeFlows" << std::endl;
+
+  for (uint32_t i = 0; i < nFlows; i++)
+    {
+      uint32_t a = nodes[i];
+
+      uint32_t n = std::rand () % neighbors[a].size ();
+      uint32_t b = neighbors[a][n];
+
+      // make a->b flow
+      flows.push_back (std::make_tuple (a, b));
+    }
+  
+  // for (uint32_t i = 0; i < nFlows; i++)
+  //   {
+  //     std::cout << std::get<0> (flows[i]) << " " << std::get<1> (flows[i]) << std::endl;
+  //   }
+
+
+  // std::exit (EXIT_SUCCESS);
 }
 
 } // namespace ns3

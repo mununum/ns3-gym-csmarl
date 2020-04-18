@@ -12,12 +12,12 @@ from ray.rllib.models.tf.recurrent_tf_modelv2 import RecurrentTFModelV2
 from ray.rllib.utils.annotations import override
 from ray.rllib.utils import try_import_tf
 
-from ns3_multiagent_env import Ns3MultiAgentEnv, on_episode_start, on_episode_step, on_episode_end
+from ns3_multiagent_env import on_episode_start, on_episode_step, on_episode_end
 
 tf = try_import_tf()
 
 
-class MyKerasRNN(RecurrentTFModelV2):
+class Ns3RNNModel(RecurrentTFModelV2):
 
     def __init__(self,
                  obs_space,
@@ -27,7 +27,7 @@ class MyKerasRNN(RecurrentTFModelV2):
                  name,
                  hiddens_size=256,
                  cell_size=64):
-        super(MyKerasRNN, self).__init__(obs_space, action_space, num_outputs,
+        super(Ns3RNNModel, self).__init__(obs_space, action_space, num_outputs,
                                          model_config, name)
         self.cell_size = cell_size
 
@@ -87,6 +87,8 @@ class MyKerasRNN(RecurrentTFModelV2):
         return tf.reshape(self._value_out, [-1])
 
 
+ModelCatalog.register_custom_model("ns3_rnn_model", Ns3RNNModel)
+
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
@@ -98,8 +100,6 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     ray.init(log_to_driver=args.debug)
-
-    ModelCatalog.register_custom_model("rnn", MyKerasRNN)
 
     cwd = os.path.dirname(os.path.abspath(__file__))
     topology = "complex"
@@ -124,7 +124,7 @@ if __name__ == "__main__":
             "timesteps_total": args.stop
         },
         config={
-            "env": Ns3MultiAgentEnv,
+            "env": "ns3_multiagent_env",
             "batch_mode": "complete_episodes",
             "log_level": "DEBUG" if args.debug else "WARN",
             "env_config": {
@@ -133,6 +133,7 @@ if __name__ == "__main__":
                 "reward": "shared",
                 "topology": topology,
                 "traffic": "cbr",
+                "fixedFlow": False,
             },
             "num_workers": 0 if args.debug else num_workers,
             "num_gpus_per_worker": num_gpus_per_worker,
@@ -141,7 +142,7 @@ if __name__ == "__main__":
             "use_gae": True,
             "sgd_minibatch_size": 2000,  # For maximum parallelism, MYTODO check whether suboptimality happens because of this
             "model": {
-                "custom_model": "rnn",
+                "custom_model": "ns3_rnn_model",
                 "max_seq_len": 20,
             },
             "callbacks": {
@@ -151,4 +152,7 @@ if __name__ == "__main__":
             }
         },
         num_samples=1 if args.debug else num_samples,
+        checkpoint_freq=10,
+        keep_checkpoints_num=1,
+        checkpoint_score_attr="episode_reward_mean",
     )

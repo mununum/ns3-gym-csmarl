@@ -97,7 +97,7 @@ def start_sim_script_without_waf(port=5555, simSeed=0, simArgs={}, debug=False, 
 		ns3Proc = subprocess.Popen(runString, shell=True, stdout=None, stderr=None, env=my_env, cwd=baseNs3Dir)
 	else:
 		errorOutput = subprocess.DEVNULL
-		ns3Proc = subprocess.Popen(runString, shell=True, stdout=subprocess.PIPE, stderr=errorOutput, universal_newlines=True, env=my_env, cwd=baseNs3Dir)
+		ns3Proc = subprocess.Popen(runString, shell=True, stdout=None, stderr=errorOutput, universal_newlines=True, env=my_env, cwd=baseNs3Dir)
 
 	if debug:
 		print("Start command: ", runString)

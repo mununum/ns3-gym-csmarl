@@ -33,6 +33,7 @@ public:
   bool ExecuteActions (Ptr<OpenGymDataContainer> action);
 
   uint32_t GetTotalPkt ();
+  double GetTotalRwd ();
 
   // the function has to be static to work with MakeBoundCallback
   // that is why we pass pointer to MyGymEnv instance to be able to store the context (node, etc)
@@ -61,6 +62,8 @@ private:
 
   bool m_enabled;
   bool m_continuous;
+
+  double m_reward_sum;
 
   float m_rate_reward;
   float m_delay_reward;

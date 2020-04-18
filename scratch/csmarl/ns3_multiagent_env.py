@@ -16,17 +16,19 @@ class Ns3MultiAgentEnv(MultiAgentEnv):
     def __init__(self, env_config):
         self.worker_index = env_config.worker_index
         topology = env_config.get("topology", "fim")
-        self.n_agents = read_graph(topology)
+        _, flows = read_graph(topology)
+        self.n_agents = len(flows)
         port = 0
-        simTime = env_config.get("simTime", 20)
         stepTime = env_config.get("stepTime", 0.02)
         seed = 0
         cwd = env_config.get("cwd", None)
         traffic = env_config.get("traffic", "cbr")
 
         self.debug = env_config.get("debug", False)
-        if self.debug:
-            simTime = 1
+        simTime_default = 1 if self.debug else 20
+        simTime = env_config.get("simTime", simTime_default)
+
+        fixedFlow = env_config.get("fixedFlow", False)
 
         self.reward = env_config.get("reward", "shared")
         assert self.reward in ["indiv", "shared"], 'self.reward must be either "indiv" or "shared"'
@@ -36,9 +38,10 @@ class Ns3MultiAgentEnv(MultiAgentEnv):
                    "--topology": topology,
                    "--traffic": traffic,
                    "--opengymEnabled": True,
+                   "--fixedFlow": fixedFlow,
                    "--debug": self.debug}
 
-        print("worker {} start".format(self.worker_index))
+        print("worker {} start".format(self.worker_index)) if self.debug else None
 
         self._env = ns3env.Ns3Env(port=port, stepTime=stepTime, startSim=True,
                                   simSeed=seed, simArgs=simArgs, debug=self.debug, cwd=cwd)
@@ -79,7 +82,7 @@ class Ns3MultiAgentEnv(MultiAgentEnv):
         return ret
 
     def reset(self):
-        print("worker {} reset".format(self.worker_index))
+        print("worker {} reset".format(self.worker_index)) if self.debug else None
         obs = self._env.reset()
         return self.obs_to_dict(obs)
 
@@ -98,7 +101,7 @@ class Ns3MultiAgentEnv(MultiAgentEnv):
         return obs, rew, done, info
 
     def close(self):
-        print("worker {} close".format(self.worker_index))
+        print("worker {} close".format(self.worker_index)) if self.debug else None
         self._env.close()
 
 
@@ -134,6 +137,8 @@ def on_episode_end(info):
         episode.custom_metrics[k] = agg
 
 
+register_env("ns3_multiagent_env", lambda env_config: Ns3MultiAgentEnv(env_config))
+
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
@@ -164,7 +169,7 @@ if __name__ == "__main__":
         "PPO",
         stop={"timesteps_total": args.stop},
         config={
-            "env": Ns3MultiAgentEnv,
+            "env": "ns3_multiagent_env",
             "batch_mode": "complete_episodes",
             "log_level": "DEBUG" if args.debug else "WARN",
             "num_workers": 0 if args.debug else num_workers,

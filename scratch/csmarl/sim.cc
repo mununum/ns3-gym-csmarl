@@ -22,7 +22,7 @@ main (int argc, char *argv[])
 {
 
   // Parameters of the environment
-  uint32_t simSeed = 1;
+  uint32_t simSeed = 0;
   double simulationTime = 20; // seconds
   double envStepTime = 0.02; // seconds, ns3gym env step time interval
   uint32_t openGymPort = 5555;
@@ -42,6 +42,8 @@ main (int argc, char *argv[])
   uint32_t payloadSize = 1500; // 1500 B/pkt * 8 b/B * 1000 pkt/s = 12.0 Mbps
   bool enabledMinstrel = false;
 
+  bool fixedFlow = false;
+
   // define datarates
   std::vector<std::string> dataRates;
   dataRates.push_back ("OfdmRate1_5MbpsBW5MHz");
@@ -57,7 +59,7 @@ main (int argc, char *argv[])
   CommandLine cmd;
   // required parameters for OpenGym interface
   cmd.AddValue ("openGymPort", "Port number for OpenGym env. Default: 5555", openGymPort);
-  cmd.AddValue ("simSeed", "Seed for random generator. Default: 1", simSeed);
+  cmd.AddValue ("simSeed", "Seed for random generator. Default: 0", simSeed);
   // optional parameters
   cmd.AddValue ("simTime", "Simulation time in seconds, Default: 20s", simulationTime);
   cmd.AddValue ("stepTime", "Step time of the environment, Default: 0.02s", envStepTime);
@@ -66,6 +68,7 @@ main (int argc, char *argv[])
   cmd.AddValue ("continuous", "Use continuous action space. Default: false", continuous);
   cmd.AddValue ("debug", "Print debug message. Default: true", debug);
   cmd.AddValue ("traffic", "Traffic type (cbr|mmpp). Default: cbr", traffic);
+  cmd.AddValue ("fixedFlow", "Do not randomize flows. Default: false", fixedFlow);
   cmd.Parse (argc, argv);
 
   NS_LOG_UNCOND ("Ns3Env parameters:");
@@ -88,6 +91,7 @@ main (int argc, char *argv[])
 
   RngSeedManager::SetSeed (1);
   RngSeedManager::SetRun (simSeed);
+  std::srand (simSeed);
 
   // open graph file
   uint32_t nNodes, nEdges, nFlows;
@@ -98,6 +102,10 @@ main (int argc, char *argv[])
   // read a graph file and assign values to nNodes, nEdges, nFlows
   // pos, edges, flows
   ReadGraph (topology, nNodes, nEdges, nFlows, pos, edges, flows);
+
+  // When enabled, generate randomized flow for this example.
+  if (!fixedFlow)
+    MakeFlows (nNodes, nEdges, nFlows, edges, flows, simSeed);
 
   // Configuration of the scenario
   // Create Nodes
@@ -295,6 +303,7 @@ main (int argc, char *argv[])
   NS_LOG_UNCOND ("Simulation stop");
 
   // NS_LOG_UNCOND (myGymEnv->GetTotalPkt ());
+  std::cout << "episode_reward: " << myGymEnv->GetTotalRwd () << std::endl;
 
   openGymInterface->NotifySimulationEnd ();
 

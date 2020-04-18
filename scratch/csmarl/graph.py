@@ -6,49 +6,74 @@ import networkx as nx
 import matplotlib.pyplot as plt
 
 
-def make_random_graph(dump_txt=True, dump_pdf=True, show_graph=True, seed=0):
+def make_random_graph(seed=0):
 
     N = 20
     d = 0.3
-    n_flows = 10
-    random.seed(seed)
 
     # generate random graph
     G = nx.random_geometric_graph(N, d, seed=seed)
-    dG = nx.DiGraph(G)
-    pos = {i: G.nodes[i]["pos"] for i in range(N)}
 
-    # pick random 1-hop flows (with non-overlapping senders)
-    nodes = random.sample(dG.nodes, n_flows)
+    return G
+
+
+def make_random_flows(G, seed=0):
+
+    random.seed(seed)
+    F = 10
+    dG = nx.DiGraph(G)
+
+    # pick random 1-hop flows
+    # option 1: with non-overlapping senders
+    nodes = random.sample(dG.nodes, F)
     flows = []
     for n in nodes:
         m = random.choice(list(dG.neighbors(n)))
         flows.append((n, m))
-    # (with possible overlapping senders)
-    # flows = random.sample(dG.edges, n_flows)
+    # option 2: with possible overlapping senders
+    # flows = random.sample(dG.edges, F)
 
-    # dump graph description
-    if dump_txt:
-        with open("graphs/complex.txt", "w") as f:
-            print(N, file=f)
-            print("\n".join([str(pos[i][0])+" "+str(pos[i][1])
-                            for i in range(N)]), file=f)
-            print(len(G.edges), file=f)
-            print("\n".join([str(e[0])+" "+str(e[1]) for e in G.edges]), file=f)
-            print(n_flows, file=f)
-            print("\n".join([str(e[0])+" "+str(e[1]) for e in flows]), file=f)
+    return flows
 
-    nx.draw(G, pos, with_labels=True, edge_color="gray", style="dashed")
-    nx.draw(dG, pos, edgelist=flows,
-            edge_color="red", width=2, arrows=True)
+
+def dump_graph_pdf(name, G, flows, dump_pdf=False, show_graph=False):
+
+    dG = nx.DiGraph(G)
+
+    plt.figure()
+    nx.draw(G, nx.get_node_attributes(G, "pos"), with_labels=True, edge_color="gray", style="dashed")
+    nx.draw(dG, nx.get_node_attributes(G, "pos"), edgelist=flows, edge_color="red", width=2, arrows=True)
+
+    if dump_pdf:
+        wd = os.path.dirname(os.path.abspath(__file__))
+        pdfname = os.path.join(wd, "graphs/"+name+".pdf")
+        plt.savefig(pdfname)
 
     if show_graph:
         plt.show()
-    if dump_pdf:
-        plt.savefig("random_topology.pdf")
 
 
-def read_graph(name, show_graph=False, dump_pdf=False):
+def dump_graph_txt(name, G, flows):
+    
+    N = len(G.nodes)
+    pos = nx.get_node_attributes(G, "pos")
+
+    wd = os.path.dirname(os.path.abspath(__file__))
+    txtfile = os.path.join(wd, "graphs/"+name+".txt")
+
+    with open(txtfile, "w") as f:
+        print(N, file=f)
+        print("\n".join([str(pos[i][0])+" "+str(pos[i][1])
+                            for i in range(N)]), file=f)
+        print(len(G.edges), file=f)
+        print("\n".join([str(e[0])+" "+str(e[1])
+                            for e in G.edges]), file=f)
+        print(len(flows), file=f)
+        print("\n".join([str(e[0])+" "+str(e[1]) for e in flows]), file=f)
+
+
+def read_graph(name):
+
     wd = os.path.dirname(os.path.abspath(__file__))
     filename = os.path.join(wd, "graphs/"+name+".txt")
     try:
@@ -67,19 +92,10 @@ def read_graph(name, show_graph=False, dump_pdf=False):
     G = nx.Graph()
     G.add_nodes_from(range(N))
     G.add_edges_from(edges)
-    dG = nx.DiGraph(G)
+    nx.set_node_attributes(G, pos, "pos")
 
-    nx.draw(G, pos, with_labels=True, edge_color="gray", style="dashed")
-    nx.draw(dG, pos, edgelist=flows,
-            edge_color="red", width=2, arrows=True)
+    return G, flows
 
-    if show_graph:
-        plt.show()
-    if dump_pdf:
-        pdfname = os.path.join(wd, "graphs/"+name+".pdf")
-        plt.savefig(pdfname)
-
-    return F
 
 if __name__ == "__main__":
 
@@ -87,14 +103,12 @@ if __name__ == "__main__":
     parser.add_argument("--seed", help="random seed", type=int, default=0)
     args = parser.parse_args()
 
-    # make_random_graph(show_graph=True, dump_txt=False, dump_pdf=False, seed=args.seed)
+    # G = make_random_graph(seed=0)
 
-    read_graph("fim", show_graph=True, dump_pdf=False)
+    G, flows = read_graph("complex")
+    dump_graph_pdf("complex", G, flows, dump_pdf=True)
 
-
-# G = nx.petersen_graph()
-# plt.subplot(121)
-# nx.draw(G, with_labels=True, font_weight='bold')
-# plt.subplot(122)
-# nx.draw_shell(G, nlist=[range(5, 10), range(5)], with_labels=True, font_weight='bold')
-# plt.show()
+    # for i in range(4):
+    #     flows = make_random_flows(G, seed=i)
+    #     dump_graph_pdf("complex-"+str(i), G, flows, dump_pdf=True)
+    #     dump_graph_txt("complex-"+str(i), G, flows)

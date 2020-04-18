@@ -34,7 +34,8 @@ class CentralizedCriticRNNModel(RecurrentTFModelV2):
                                                         model_config, name)
         self.cell_size = cell_size
 
-        self.n_agents_in_critic = read_graph(model_config["custom_options"]["topology"])
+        _, flows = read_graph(model_config["custom_options"]["topology"])
+        self.n_agents_in_critic = len(flows)
         self.obs_dim = obs_space.shape[0]
         self.act_dim = self.num_outputs
         # MYTODO make proper mapping on agent_id
@@ -200,7 +201,7 @@ if __name__ == "__main__":
             "timesteps_total": args.stop,
         },
         config={
-            "env": Ns3MultiAgentEnv,
+            "env": "ns3_multiagent_env",
             "batch_mode": "complete_episodes",
             "log_level": "DEBUG" if args.debug else "WARN",
             "env_config": env_config,

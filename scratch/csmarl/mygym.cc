@@ -93,6 +93,8 @@ MyGymEnv::MyGymEnv (NodeContainer agents, Time simTime, Time stepTime, bool enab
 
   m_continuous = continuous;
 
+  m_reward_sum = 0.0;
+
   // initialize per-agent internal state
   uint32_t numAgents = m_agents.GetN ();
   for (uint32_t i = 0; i < numAgents; i++)
@@ -174,6 +176,12 @@ MyGymEnv::GetTotalPkt ()
     }
   // std::cout << rxPktSum << std::endl;
   return rxPktSum;
+}
+
+double
+MyGymEnv::GetTotalRwd ()
+{
+  return m_reward_sum * m_agents.GetN ();
 }
 
 void
@@ -271,6 +279,7 @@ MyGymEnv::GetObservation ()
   uint32_t pktSum = 0;
 
   NS_LOG_DEBUG (Simulator::Now () << " MyGetObservation:");
+  // std::cout << Simulator::Now ().GetSeconds () << " step" << std::endl;
 
   uint32_t numAgents = m_agents.GetN ();
   for (uint32_t i = 0; i < numAgents; i++)
@@ -387,6 +396,7 @@ MyGymEnv::GetReward ()
   // reward = rate_reward - 100 * delay_reward - 200 * loss_reward;
   // reward = rate_reward - 100 * delay_reward;
   reward = rate_reward;
+  
   m_rate_reward = rate_reward;
   m_delay_reward = delay_reward;
 
@@ -397,6 +407,9 @@ MyGymEnv::GetReward ()
 
   reward /= reward_scale;
   NS_LOG_DEBUG ("MyGetReward: " << reward);
+
+  m_reward_sum += reward;
+
   return reward;
 }
 

@@ -83,7 +83,7 @@ MyGymEnv::MyGymEnv ()
 }
 
 MyGymEnv::MyGymEnv (NodeContainer agents, Time simTime, Time stepTime, bool enabled = true,
-                    bool continuous = false)
+                    bool continuous = false, bool debug = false)
 {
   NS_LOG_FUNCTION (this);
   m_agents = agents;
@@ -92,6 +92,7 @@ MyGymEnv::MyGymEnv (NodeContainer agents, Time simTime, Time stepTime, bool enab
   m_simTime = simTime;
 
   m_continuous = continuous;
+  m_debug = debug;
 
   m_reward_sum = 0.0;
 
@@ -176,12 +177,6 @@ MyGymEnv::GetTotalPkt ()
     }
   // std::cout << rxPktSum << std::endl;
   return rxPktSum;
-}
-
-double
-MyGymEnv::GetTotalRwd ()
-{
-  return m_reward_sum * m_agents.GetN ();
 }
 
 void
@@ -279,7 +274,8 @@ MyGymEnv::GetObservation ()
   uint32_t pktSum = 0;
 
   NS_LOG_DEBUG (Simulator::Now () << " MyGetObservation:");
-  // std::cout << Simulator::Now ().GetSeconds () << " step" << std::endl;
+  // if (m_debug)
+  //   std::cout << Simulator::Now ().GetSeconds () << "\t";
 
   uint32_t numAgents = m_agents.GetN ();
   for (uint32_t i = 0; i < numAgents; i++)
@@ -330,10 +326,21 @@ MyGymEnv::GetObservation ()
       box->AddValue (mincw);
 
       NS_LOG_DEBUG (thpt << ",\t" << avg_thpt << ",\t" << lat << ",\t" << err_rate << ",\t" << mincw);
+      if (m_debug)
+        std::cout << thpt << "\t" << avg_thpt << "\t";
+      
+      // if (m_debug) {
+      //   Ptr<ODcfAdhocWifiMac> omac = DynamicCast<ODcfAdhocWifiMac> (wifi_mac);
+      //   if (omac) {
+      //     std::cout << omac->GetMAQSize () << "\t";
+      //   }
+      // }
 
       // agent_id
       // box->AddValue (i);
     }
+  if (m_debug)
+    std::cout << std::endl;
 
   // for (NodeList::Iterator i = NodeList::Begin (); i != NodeList::End (); ++i) {
   //     Ptr<Node> node = *i;
@@ -597,6 +604,17 @@ MyGymEnv::SrcTxFail (Ptr<MyGymEnv> entity, Ptr<Node> node, uint32_t idx, const W
       NS_LOG_DEBUG ("Node with ID " << node->GetId () << " has failed to send a packet with size "
                                     << packet->GetSize ());
     }
+}
+
+void
+MyGymEnv::PrintResults (void)
+{
+  for (uint32_t i = 0; i < m_agents.GetN (); i++)
+    {
+      std::cout << m_agent_state[i]->m_txPktNum << ", ";
+    }
+  std::cout << std::endl;
+  std::cout << "episode_reward: " << m_reward_sum * m_agents.GetN () << std::endl;
 }
 
 } // namespace ns3

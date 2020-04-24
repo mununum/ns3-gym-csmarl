@@ -29,6 +29,7 @@ def build(bld):
         'model/mac-tx-middle.cc',
         'model/mac-rx-middle.cc',
         'model/txop.cc',
+        'model/odcf-txop.cc',  # O-DCF
         'model/supported-rates.cc',
         'model/capability-information.cc',
         'model/status-code.cc',
@@ -41,7 +42,10 @@ def build(bld):
         'model/ap-wifi-mac.cc',
         'model/sta-wifi-mac.cc',
         'model/adhoc-wifi-mac.cc',
+        'model/odcf-adhoc-wifi-mac.cc',  # O-DCF
         'model/wifi-net-device.cc',
+        'model/odcf.cc',  # O-DCF
+        'model/odcf-queue.cc',  # O-DCF
         'model/arf-wifi-manager.cc',
         'model/aarf-wifi-manager.cc',
         'model/ideal-wifi-manager.cc',
@@ -115,6 +119,8 @@ def build(bld):
         'model/wifi-information-element.h',
         'model/wifi-information-element-vector.h',
         'model/wifi-net-device.h',
+        'model/odcf.h',  # O-DCF
+        'model/odcf-queue.h',  # O-DCF
         'model/wifi-mode.h',
         'model/ssid.h',
         'model/wifi-preamble.h',
@@ -131,6 +137,7 @@ def build(bld):
         'model/ap-wifi-mac.h',
         'model/sta-wifi-mac.h',
         'model/adhoc-wifi-mac.h',
+        'model/odcf-adhoc-wifi-mac.h',  # O-DCF
         'model/arf-wifi-manager.h',
         'model/aarf-wifi-manager.h',
         'model/ideal-wifi-manager.h',
@@ -152,6 +159,7 @@ def build(bld):
         'model/dsss-error-rate-model.h',
         'model/wifi-mac-queue.h',
         'model/txop.h',
+        'model/odcf-txop.h',  # O-DCF
         'model/wifi-mac-header.h',
         'model/wifi-mac-trailer.h',
         'model/wifi-phy-state-helper.h',

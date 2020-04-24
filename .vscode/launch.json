@@ -33,7 +33,31 @@
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/build/scratch/csmarl/csmarl",
-            "args": ["--topology=complex"],
+            "args": ["--topology=fim", "--algorithm=odcf", "--simTime=60", "--debug=true"],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [
+                {
+                    "name": "LD_LIBRARY_PATH",
+                    "value": "./build/lib/"
+                }
+            ],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ]
+         },
+         {
+            "name": "(gdb) flow-in-the-middle",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/scratch/flow-in-the-middle",
+            "args": [""],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "environment": [

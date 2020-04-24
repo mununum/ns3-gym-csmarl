@@ -133,7 +133,7 @@ if __name__ == "__main__":
                 "reward": "shared",
                 "topology": topology,
                 "traffic": "cbr",
-                "fixedFlow": False,
+                "randomFlow": True,
             },
             "num_workers": 0 if args.debug else num_workers,
             "num_gpus_per_worker": num_gpus_per_worker,

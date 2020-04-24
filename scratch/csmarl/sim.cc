@@ -17,6 +17,49 @@ using namespace ns3;
 
 NS_LOG_COMPONENT_DEFINE ("OpenGym");
 
+void
+PopulateArpCache ()
+{
+  // return;
+  Ptr<ArpCache> arp = CreateObject<ArpCache> ();
+  for (NodeList::Iterator i = NodeList::Begin (); i != NodeList::End (); i++)
+    {
+      Ptr<Ipv4L3Protocol> ip = (*i)->GetObject<Ipv4L3Protocol> ();
+      NS_ASSERT (ip != 0);
+      ObjectVectorValue interfaces;
+      ip->GetAttribute ("InterfaceList", interfaces);
+      for (ObjectVectorValue::Iterator j = interfaces.Begin (); j != interfaces.End (); j++)
+        {
+          Ptr<Ipv4Interface> ipIface = (j->second)->GetObject<Ipv4Interface> ();
+          NS_ASSERT (ipIface != 0);
+          Ptr<NetDevice> device = ipIface->GetDevice ();
+          NS_ASSERT (device != 0);
+          Mac48Address addr = Mac48Address::ConvertFrom (device->GetAddress ());
+          for (uint32_t k = 0; k < ipIface->GetNAddresses (); k++)
+            {
+              Ipv4Address ipAddr = ipIface->GetAddress (k).GetLocal ();
+              if (ipAddr == Ipv4Address::GetLoopback ())
+                continue;
+              ArpCache::Entry *entry = arp->Add (ipAddr);
+              entry->SetMacAddress (addr);
+              entry->MarkPermanent ();
+            }
+        }
+    }
+  for (NodeList::Iterator i = NodeList::Begin (); i != NodeList::End (); i++)
+    {
+      Ptr<Ipv4L3Protocol> ip = (*i)->GetObject<Ipv4L3Protocol> ();
+      NS_ASSERT (ip != 0);
+      ObjectVectorValue interfaces;
+      ip->GetAttribute ("InterfaceList", interfaces);
+      for (ObjectVectorValue::Iterator j = interfaces.Begin (); j != interfaces.End (); j++)
+        {
+          Ptr<Ipv4Interface> ipIface = (j->second)->GetObject<Ipv4Interface> ();
+          ipIface->SetAttribute ("ArpCache", PointerValue (arp));
+        }
+    }
+}
+
 int
 main (int argc, char *argv[])
 {
@@ -29,7 +72,7 @@ main (int argc, char *argv[])
   bool debug = true;
 
   // OpenGym Env
-  bool opengymEnabled = false;
+  std::string algorithm;
   bool continuous = false;
 
   // Parameters of the scenario
@@ -42,7 +85,7 @@ main (int argc, char *argv[])
   uint32_t payloadSize = 1500; // 1500 B/pkt * 8 b/B * 1000 pkt/s = 12.0 Mbps
   bool enabledMinstrel = false;
 
-  bool fixedFlow = false;
+  bool randomFlow = false;
 
   // define datarates
   std::vector<std::string> dataRates;
@@ -64,11 +107,11 @@ main (int argc, char *argv[])
   cmd.AddValue ("simTime", "Simulation time in seconds, Default: 20s", simulationTime);
   cmd.AddValue ("stepTime", "Step time of the environment, Default: 0.02s", envStepTime);
   cmd.AddValue ("topology", "Interference topology. (on graph file), Default: fim", topology);
-  cmd.AddValue ("opengymEnabled", "Using openAI gym or not. Default: false", opengymEnabled);
+  cmd.AddValue ("algorithm", "MAC algorithm to use (80211|odcf|rl). Defaule: 80211", algorithm);
   cmd.AddValue ("continuous", "Use continuous action space. Default: false", continuous);
   cmd.AddValue ("debug", "Print debug message. Default: true", debug);
   cmd.AddValue ("traffic", "Traffic type (cbr|mmpp). Default: cbr", traffic);
-  cmd.AddValue ("fixedFlow", "Do not randomize flows. Default: false", fixedFlow);
+  cmd.AddValue ("randomFlow", "Randomize flows. Default: false", randomFlow);
   cmd.Parse (argc, argv);
 
   NS_LOG_UNCOND ("Ns3Env parameters:");
@@ -104,7 +147,7 @@ main (int argc, char *argv[])
   ReadGraph (topology, nNodes, nEdges, nFlows, pos, edges, flows);
 
   // When enabled, generate randomized flow for this example.
-  if (!fixedFlow)
+  if (randomFlow)
     MakeFlows (nNodes, nEdges, nFlows, edges, flows, simSeed);
 
   // Configuration of the scenario
@@ -180,7 +223,11 @@ main (int argc, char *argv[])
     }
 
   // Set it to adhoc mode
-  wifiMac.SetType ("ns3::AdhocWifiMac", "QosSupported", BooleanValue (false));
+  Config::SetDefault ("ns3::WifiMacQueue::MaxDelay", TimeValue (Seconds (simulationTime)));
+  if (algorithm == "odcf")
+    wifiMac.SetType ("ns3::ODcfAdhocWifiMac", "QosSupported", BooleanValue (false));
+  else
+    wifiMac.SetType ("ns3::AdhocWifiMac", "QosSupported", BooleanValue (false));
 
   // Install wifi device
   NetDeviceContainer devices = wifi.Install (spectrumPhy, wifiMac, nodes);
@@ -196,6 +243,9 @@ main (int argc, char *argv[])
   Ipv4InterfaceContainer interfaces = ipv4.Assign (devices);
 
   // Configure routing (no need right now)
+
+  // Configure ARP cache
+  PopulateArpCache ();
 
   uint16_t port = 1000;
   NodeContainer srcNodes;
@@ -279,7 +329,7 @@ main (int argc, char *argv[])
   // Configure OpenGym environment
   Ptr<OpenGymInterface> openGymInterface = CreateObject<OpenGymInterface> (openGymPort);
   Ptr<MyGymEnv> myGymEnv = CreateObject<MyGymEnv> (
-      srcNodes, Seconds (simulationTime), Seconds (envStepTime), opengymEnabled, continuous);
+      srcNodes, Seconds (simulationTime), Seconds (envStepTime), algorithm == "rl", continuous, debug);
 
   myGymEnv->SetOpenGymInterface (openGymInterface);
 
@@ -303,7 +353,7 @@ main (int argc, char *argv[])
   NS_LOG_UNCOND ("Simulation stop");
 
   // NS_LOG_UNCOND (myGymEnv->GetTotalPkt ());
-  std::cout << "episode_reward: " << myGymEnv->GetTotalRwd () << std::endl;
+  myGymEnv->PrintResults ();
 
   openGymInterface->NotifySimulationEnd ();
 

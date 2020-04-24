@@ -28,7 +28,7 @@ class Ns3MultiAgentEnv(MultiAgentEnv):
         simTime_default = 1 if self.debug else 20
         simTime = env_config.get("simTime", simTime_default)
 
-        fixedFlow = env_config.get("fixedFlow", False)
+        randomFlow = env_config.get("randomFlow", False)
 
         self.reward = env_config.get("reward", "shared")
         assert self.reward in ["indiv", "shared"], 'self.reward must be either "indiv" or "shared"'
@@ -37,8 +37,8 @@ class Ns3MultiAgentEnv(MultiAgentEnv):
                    "--stepTime": stepTime,
                    "--topology": topology,
                    "--traffic": traffic,
-                   "--opengymEnabled": True,
-                   "--fixedFlow": fixedFlow,
+                   "--algorithm": "rl",
+                   "--randomFlow": randomFlow,
                    "--debug": self.debug}
 
         print("worker {} start".format(self.worker_index)) if self.debug else None

@@ -18,7 +18,7 @@ class MyGymEnv : public OpenGymEnv
 {
 public:
   MyGymEnv (); // for typeid registration
-  MyGymEnv (NodeContainer agents, Time simTime, Time stepTime, bool enabled, bool continuous);
+  MyGymEnv (NodeContainer agents, Time simTime, Time stepTime, bool enabled, bool continuous, bool debug);
 
   virtual ~MyGymEnv ();
   static TypeId GetTypeId (void);
@@ -33,7 +33,7 @@ public:
   bool ExecuteActions (Ptr<OpenGymDataContainer> action);
 
   uint32_t GetTotalPkt ();
-  double GetTotalRwd ();
+  void PrintResults ();
 
   // the function has to be static to work with MakeBoundCallback
   // that is why we pass pointer to MyGymEnv instance to be able to store the context (node, etc)
@@ -62,6 +62,7 @@ private:
 
   bool m_enabled;
   bool m_continuous;
+  bool m_debug;
 
   double m_reward_sum;
 

@@ -28,6 +28,7 @@
 #include "ns3/socket-factory.h"
 #include "ns3/packet.h"
 #include "ns3/uinteger.h"
+#include "ns3/delay-jitter-estimation.h"
 #include "udp-client.h"
 #include "seq-ts-header.h"
 #include <cstdlib>
@@ -175,6 +176,7 @@ UdpClient::Send (void)
   SeqTsHeader seqTs;
   seqTs.SetSeq (m_sent);
   Ptr<Packet> p = Create<Packet> (m_size-(8+4)); // 8+4 : the size of the seqTs header
+  DelayJitterEstimation::PrepareTx (p);
   p->AddHeader (seqTs);
 
   std::stringstream peerAddressStringStream;

@@ -82,7 +82,7 @@ main (int argc, char *argv[])
   std::string errorModelType = "ns3::NistErrorRateModel";
   // bool enableFading = true;
   uint32_t pktPerSec = 1000;
-  uint32_t payloadSize = 1500; // 1500 B/pkt * 8 b/B * 1000 pkt/s = 12.0 Mbps
+  uint32_t payloadSize = 1500; // 1500 B/pkt * 8 b/B * 1000 pkt/s = 12.0 Mbps -- saturated traffic
   bool enabledMinstrel = false;
 
   bool randomFlow = false;
@@ -226,8 +226,11 @@ main (int argc, char *argv[])
   Config::SetDefault ("ns3::WifiMacQueue::MaxDelay", TimeValue (Seconds (simulationTime)));
   if (algorithm == "odcf")
     wifiMac.SetType ("ns3::ODcfAdhocWifiMac", "QosSupported", BooleanValue (false));
-  else
+  else if (algorithm == "80211" || algorithm == "rl")
     wifiMac.SetType ("ns3::AdhocWifiMac", "QosSupported", BooleanValue (false));
+  else
+    NS_FATAL_ERROR ("algorithm must be (80211|odcf|rl)");
+  
 
   // Install wifi device
   NetDeviceContainer devices = wifi.Install (spectrumPhy, wifiMac, nodes);

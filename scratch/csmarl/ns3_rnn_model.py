@@ -96,13 +96,14 @@ if __name__ == "__main__":
         "--stop", help="number of timesteps, default 3e8", type=int, default=3e8)
     parser.add_argument(
         "--debug", help="debug indicator, default false", type=bool, default=False)
+    parser.add_argument(
+        "--topology", help="topology to train, default complex", type=str, default="complex")
 
     args = parser.parse_args()
 
     ray.init(log_to_driver=args.debug)
 
     cwd = os.path.dirname(os.path.abspath(__file__))
-    topology = "complex"
 
     NUM_GPUS = 4
     num_workers = 16
@@ -131,9 +132,9 @@ if __name__ == "__main__":
                 "cwd": cwd,
                 "debug": args.debug,
                 "reward": "shared",
-                "topology": topology,
+                "topology": args.topology,
                 "traffic": "cbr",
-                "randomFlow": True,
+                "randomFlow": True if args.topology == "complex" else False,
             },
             "num_workers": 0 if args.debug else num_workers,
             "num_gpus_per_worker": num_gpus_per_worker,

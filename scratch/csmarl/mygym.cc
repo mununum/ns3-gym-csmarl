@@ -327,7 +327,7 @@ MyGymEnv::GetObservation ()
 
       NS_LOG_DEBUG (thpt << ",\t" << avg_thpt << ",\t" << lat << ",\t" << err_rate << ",\t" << mincw);
       if (m_debug)
-        std::cout << thpt << "\t" << avg_thpt << "\t";
+        std::cout << m_agent_state[i]->getAvgTxDelay () / 1e6 << "\t";
       
       // if (m_debug) {
       //   Ptr<ODcfAdhocWifiMac> omac = DynamicCast<ODcfAdhocWifiMac> (wifi_mac);

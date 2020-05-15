@@ -23,6 +23,8 @@ class Ns3MultiAgentEnv(MultiAgentEnv):
         seed = 0
         cwd = env_config.get("cwd", None)
         traffic = env_config.get("traffic", "cbr")
+        intensity = env_config.get("intensity", 1)
+        delayRewardWeight = env_config.get("delayRewardWeight", 0.0)
 
         self.debug = env_config.get("debug", False)
         simTime_default = 1 if self.debug else 20
@@ -37,8 +39,10 @@ class Ns3MultiAgentEnv(MultiAgentEnv):
                    "--stepTime": stepTime,
                    "--topology": topology,
                    "--traffic": traffic,
+                   "--intensity": intensity,
                    "--algorithm": "rl",
                    "--randomFlow": randomFlow,
+                   "--delayRewardWeight": delayRewardWeight,
                    "--debug": self.debug}
 
         print("worker {} start".format(self.worker_index)) if self.debug else None

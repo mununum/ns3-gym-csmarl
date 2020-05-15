@@ -18,7 +18,8 @@ class MyGymEnv : public OpenGymEnv
 {
 public:
   MyGymEnv (); // for typeid registration
-  MyGymEnv (NodeContainer agents, Time simTime, Time stepTime, bool enabled, bool continuous, bool debug);
+  MyGymEnv (NodeContainer agents, Time simTime, Time stepTime, bool enabled, bool continuous,
+            float delayRewardWeight, bool debug);
 
   virtual ~MyGymEnv ();
   static TypeId GetTypeId (void);
@@ -66,11 +67,16 @@ private:
 
   double m_reward_sum;
 
+  uint32_t m_totalTxPkt;
+  double m_e2eDelayEWMA; // nanoseconds
+
   float m_rate_reward;
   float m_delay_reward;
   // float m_loss_reward;
 
   uint32_t m_perAgentObsDim;
+
+  float m_delayRewardWeight;
 };
 
 } // namespace ns3

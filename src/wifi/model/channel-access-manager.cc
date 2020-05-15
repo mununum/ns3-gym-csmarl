@@ -285,15 +285,15 @@ ChannelAccessManager::RequestAccess (Ptr<Txop> state, bool isCfPeriod)
   NS_LOG_FUNCTION (this << state);
 
   // Mark the HOL packet tag
-  // {
-  //   Ptr<WifiMacQueue> queue = state->GetWifiMacQueue ();
-  //   if (!queue->IsEmpty ()) {
-  //     Ptr<const Packet> p = queue->Peek ()->GetPacket ();
-  //     if (p && !DelayJitterEstimation::IsMarked (p)) {
-  //       DelayJitterEstimation::PrepareTx (p);
-  //     }
-  //   }
-  // }
+  {
+    Ptr<WifiMacQueue> queue = state->GetWifiMacQueue ();
+    if (!queue->IsEmpty ()) {
+      Ptr<const Packet> p = queue->Peek ()->GetPacket ();
+      if (p && !DelayJitterEstimation::IsMarked (p)) {
+        DelayJitterEstimation::PrepareTx (p);
+      }
+    }
+  }
 
   //Deny access if in sleep mode or off
   if (m_sleeping || m_off)

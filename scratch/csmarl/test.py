@@ -24,15 +24,16 @@ startSim = bool(args.start)
 iterationNum = int(args.iterations)
 
 port = 5555
-simTime = 60 # seconds
+simTime = 20 # seconds
 stepTime = 0.02  # seconds
 seed = 0
+debug = True
 simArgs = {"--simTime": simTime,
            "--stepTime": stepTime,
-           "--topology": "complex",
-           "--opengymEnabled": True,
-           "--fixedFlow": True}
-debug = False
+           "--topology": "single",
+           "--algorithm": "rl",
+           "--randomFlow": False,
+           "--debug": debug}
 
 env = ns3env.Ns3Env(port=port, stepTime=stepTime, startSim=startSim, simSeed=seed, simArgs=simArgs, debug=debug)
 # simpler:
@@ -58,7 +59,8 @@ try:
 
         for _ in range(int(simTime / stepTime)):
             stepIdx += 1
-            action = env.action_space.sample()
+            # action = env.action_space.sample()
+            action = (0,)
             # print("---action: ", action)
 
             # print("Step: ", stepIdx)

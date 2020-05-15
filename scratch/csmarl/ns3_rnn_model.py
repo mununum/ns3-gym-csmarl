@@ -98,6 +98,8 @@ if __name__ == "__main__":
         "--debug", help="debug indicator, default false", type=bool, default=False)
     parser.add_argument(
         "--topology", help="topology to train, default complex", type=str, default="complex")
+    parser.add_argument(
+        "--delayRewardWeight", help="use delay reward, default false", type=float, default=0.0)
 
     args = parser.parse_args()
 
@@ -133,6 +135,7 @@ if __name__ == "__main__":
                 "debug": args.debug,
                 "reward": "shared",
                 "topology": args.topology,
+                "delayRewardWeight": args.delayRewardWeight,
                 "traffic": "cbr",
                 "randomFlow": True if args.topology == "complex" else False,
             },

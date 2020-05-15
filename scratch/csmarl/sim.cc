@@ -72,7 +72,7 @@ main (int argc, char *argv[])
   bool debug = true;
 
   // OpenGym Env
-  std::string algorithm;
+  std::string algorithm = "80211";
   bool continuous = false;
 
   // Parameters of the scenario
@@ -81,11 +81,15 @@ main (int argc, char *argv[])
   bool noErrors = false;
   std::string errorModelType = "ns3::NistErrorRateModel";
   // bool enableFading = true;
-  uint32_t pktPerSec = 1000;
-  uint32_t payloadSize = 1500; // 1500 B/pkt * 8 b/B * 1000 pkt/s = 12.0 Mbps -- saturated traffic
+  double intensity = 1.0;  // traffic intensity
+  uint32_t pktPerSecBase = 1000;  // when intensity = 1: 1500 B/pkt * 8 b/B * 1000 pkt/s = 12.0 Mbps -- saturated traffic
+  uint32_t payloadSize = 1500;
   bool enabledMinstrel = false;
 
   bool randomFlow = false;
+
+  std::string queueSize = "100p";
+  float delayRewardWeight = 0.0;
 
   // define datarates
   std::vector<std::string> dataRates;
@@ -94,10 +98,10 @@ main (int argc, char *argv[])
   dataRates.push_back ("OfdmRate3MbpsBW5MHz");
   dataRates.push_back ("OfdmRate4_5MbpsBW5MHz");
   dataRates.push_back ("OfdmRate6MbpsBW5MHz");
-  dataRates.push_back ("OfdmRate9MbpsBW5MHz"); // <--
-  dataRates.push_back ("OfdmRate12MbpsBW5MHz");
+  dataRates.push_back ("OfdmRate9MbpsBW5MHz");
+  dataRates.push_back ("OfdmRate12MbpsBW5MHz"); // <--
   dataRates.push_back ("OfdmRate13_5MbpsBW5MHz");
-  uint32_t dataRateId = 5;
+  uint32_t dataRateId = 6;
 
   CommandLine cmd;
   // required parameters for OpenGym interface
@@ -111,7 +115,10 @@ main (int argc, char *argv[])
   cmd.AddValue ("continuous", "Use continuous action space. Default: false", continuous);
   cmd.AddValue ("debug", "Print debug message. Default: true", debug);
   cmd.AddValue ("traffic", "Traffic type (cbr|mmpp). Default: cbr", traffic);
+  cmd.AddValue ("intensity", "Intensity of the traffic. Default: 1.0", intensity);
   cmd.AddValue ("randomFlow", "Randomize flows. Default: false", randomFlow);
+  cmd.AddValue ("queueSize", "Size of MAC layer buffer. Default: 100p", queueSize);
+  cmd.AddValue ("delayRewardWeight", "Weight of delay reward. Default: 0.0", delayRewardWeight);
   cmd.Parse (argc, argv);
 
   NS_LOG_UNCOND ("Ns3Env parameters:");
@@ -122,9 +129,11 @@ main (int argc, char *argv[])
 
   if (debug)
     {
-      LogComponentEnable ("OpenGym", LOG_LEVEL_DEBUG);
-      LogComponentEnable ("MyGymEnv", LOG_LEVEL_DEBUG);
-      LogComponentEnable ("OpenGymInterface", LOG_LEVEL_DEBUG);
+      // LogComponentEnable ("OpenGym", LOG_LEVEL_DEBUG);
+      // LogComponentEnable ("MyGymEnv", LOG_LEVEL_DEBUG);
+      // LogComponentEnable ("OpenGymInterface", LOG_LEVEL_DEBUG);
+      // LogComponentEnable ("ODcfQueue", LOG_LOGIC);
+      // LogComponentEnable ("Queue", LOG_LEVEL_INFO);
     }
 
   if (noErrors)
@@ -224,6 +233,7 @@ main (int argc, char *argv[])
 
   // Set it to adhoc mode
   Config::SetDefault ("ns3::WifiMacQueue::MaxDelay", TimeValue (Seconds (simulationTime)));
+  Config::SetDefault ("ns3::QueueBase::MaxSize", QueueSizeValue (QueueSize (queueSize)));
   if (algorithm == "odcf")
     wifiMac.SetType ("ns3::ODcfAdhocWifiMac", "QosSupported", BooleanValue (false));
   else if (algorithm == "80211" || algorithm == "rl")
@@ -271,6 +281,8 @@ main (int argc, char *argv[])
 
       InetSocketAddress destAddress (dest_ip_addr, port);
       destAddress.SetTos (0x70); // AC_BE
+
+      uint32_t pktPerSec = pktPerSecBase * intensity;
 
       if (traffic == "cbr")
         {
@@ -332,7 +344,7 @@ main (int argc, char *argv[])
   // Configure OpenGym environment
   Ptr<OpenGymInterface> openGymInterface = CreateObject<OpenGymInterface> (openGymPort);
   Ptr<MyGymEnv> myGymEnv = CreateObject<MyGymEnv> (
-      srcNodes, Seconds (simulationTime), Seconds (envStepTime), algorithm == "rl", continuous, debug);
+      srcNodes, Seconds (simulationTime), Seconds (envStepTime), algorithm == "rl", continuous, delayRewardWeight, debug);
 
   myGymEnv->SetOpenGymInterface (openGymInterface);
 

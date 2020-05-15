@@ -45,3 +45,4 @@ build/
 *_pb3.py
 .vscode/*
 scratch/csmarl/out
+out/*

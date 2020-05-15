@@ -33,7 +33,7 @@
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/build/scratch/csmarl/csmarl",
-            "args": ["--topology=fim", "--algorithm=odcf", "--simTime=60", "--debug=true"],
+            "args": ["--topology=single", "--algorithm=80211"],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "environment": [

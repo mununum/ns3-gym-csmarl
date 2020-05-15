@@ -347,7 +347,7 @@ NetDeviceQueue::PacketEnqueued (Ptr<Queue<Item> > queue,
     {
       NS_LOG_DEBUG ("The device queue is being stopped (" << queue->GetNPackets ()
                     << " packets and " << queue->GetNBytes () << " bytes inside)");
-      ndqi->GetTxQueue (txq)->Stop ();
+      // ndqi->GetTxQueue (txq)->Stop ();
     }
 }
 

@@ -15,8 +15,8 @@ if __name__ == "__main__":
     checkpoint = os.path.expanduser(checkpoint)
     args = parser.parse_args(["--run=PPO", "--no-render", checkpoint])
 
-    simTime = 60
-    stepTime = 0.02
+    simTime = 20
+    stepTime = 0.005
     nSteps_per_episode = simTime / stepTime
     iterations = 10
     args.steps = nSteps_per_episode * iterations

@@ -20,7 +20,7 @@ class Ns3MultiAgentEnv(MultiAgentEnv):
         self.n_agents = len(flows)
         port = 0
         stepTime = env_config.get("stepTime", 0.005)
-        seed = 0
+        seed = env_config.get("seed", 0)
         cwd = env_config.get("cwd", None)
         traffic = env_config.get("traffic", "cbr")
         intensity = env_config.get("intensity", 1)

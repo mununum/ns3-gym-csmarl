@@ -65,7 +65,7 @@ class Ns3RNNModel(RecurrentTFModelV2):
             inputs=[input_layer, seq_in, state_in_h, state_in_c],
             outputs=[logits, values, state_h, state_c])
         self.register_variables(self.rnn_model.variables)
-        self.rnn_model.summary()  # dump the model info
+        # self.rnn_model.summary()  # dump the model info
 
     @override(RecurrentTFModelV2)
     def forward_rnn(self, inputs, state, seq_lens):
@@ -99,7 +99,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--topology", help="topology to train, default complex", type=str, default="complex")
     parser.add_argument(
-        "--delayRewardWeight", help="use delay reward, default false", type=float, default=0.0)
+        "--delayRewardWeight", help="weight of delay reward, default 0.0", type=float, default=0.0)
 
     args = parser.parse_args()
 
@@ -108,7 +108,7 @@ if __name__ == "__main__":
     cwd = os.path.dirname(os.path.abspath(__file__))
 
     NUM_GPUS = 4
-    num_workers = 16
+    num_workers = 8
 
     if args.debug:
         params_list = [0]

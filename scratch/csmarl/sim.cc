@@ -111,7 +111,7 @@ main (int argc, char *argv[])
   cmd.AddValue ("simTime", "Simulation time in seconds, Default: 20s", simulationTime);
   cmd.AddValue ("stepTime", "Step time of the environment, Default: 0.02s", envStepTime);
   cmd.AddValue ("topology", "Interference topology. (on graph file), Default: fim", topology);
-  cmd.AddValue ("algorithm", "MAC algorithm to use (80211|odcf|rl). Defaule: 80211", algorithm);
+  cmd.AddValue ("algorithm", "MAC algorithm to use (80211|odcf|rl). Default: 80211", algorithm);
   cmd.AddValue ("continuous", "Use continuous action space. Default: false", continuous);
   cmd.AddValue ("debug", "Print debug message. Default: true", debug);
   cmd.AddValue ("traffic", "Traffic type (cbr|mmpp). Default: cbr", traffic);

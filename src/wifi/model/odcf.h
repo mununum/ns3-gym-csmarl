@@ -48,6 +48,9 @@ public:
 
   Mac48Address GetAddress () const;
 
+  void SetCw (uint32_t minCw);  // called by RL agent
+  uint32_t GetMAQLength ();
+
 private:
   Ptr<ODcfQueue> Find (const Mac48Address& to) const;
   Ptr<ODcfQueue> LinkSchedule ();
@@ -85,6 +88,9 @@ private:
   uint32_t m_controlQueueMaxPackets;
   double m_C;
   Mode m_mode;
+
+  bool m_RLmode;
+  uint32_t m_minCw;  // only used in RL mode
 
   Variant m_variant;
 };

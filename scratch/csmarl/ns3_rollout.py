@@ -6,6 +6,7 @@ import ray
 import myrollout as rollout
 
 import ns3_rnn_model
+import ns3_rnn_centralized
 
 if __name__ == "__main__":
 
@@ -16,11 +17,17 @@ if __name__ == "__main__":
     # FC-9
     # exp_str = "PPO_ns3_multiagent_env_4456bcf2"
     # FC-12
-    exp_str = "PPO_ns3_multiagent_env_4b0b8136"
+    # exp_str = "PPO_ns3_multiagent_env_4b0b8136"
     # FIM
     # exp_str = "PPO_ns3_multiagent_env_6e1d89ce"
+    # FIM-RC, ns3_rnn_model, lr=5e-4
+    # exp_str = "PPO_ns3_multiagent_env_8a8cb833"
+    # FIM-RC, ns3_rnn_centralized, lr=5e-5
+    exp_str = "CCPPOTrainer_ns3_multiagent_env_7b4731be"
 
-    exp_str_pattern = "~/ray_results/PPO/" + exp_str + "*"
+    alg = exp_str.split("_")[0]
+
+    exp_str_pattern = "~/ray_results/" + alg + "/" + exp_str + "*"
     path = glob.glob(os.path.expanduser(exp_str_pattern))
     if len(path) != 1:
         print("ambiguous path")
@@ -32,9 +39,11 @@ if __name__ == "__main__":
         print("no checkpoint file")
         exit()
     elif len(checkpoint_files) <= 2:
-        # select the checkpoint with the best reward
         r = [int(f.split('/')[-1].split('_')[-1]) for f in checkpoint_files]
-        chpno = min(r)
+        # select the checkpoint with the best reward
+        # chpno = min(r)
+        # select the latest checkpoint
+        chpno = max(r)
     else:
         print("many checkpoints")
         exit()
@@ -46,7 +55,8 @@ if __name__ == "__main__":
         topo_inherit = params["env_config"]["topology"]
 
     parser = rollout.create_parser()
-    args = parser.parse_args(["--run=PPO", "--no-render", checkpoint])
+    # args = parser.parse_args(["--run=PPO", "--no-render", checkpoint])
+    args = parser.parse_args(["--run=" + alg, "--no-render", checkpoint])
 
     simTime = 20
     stepTime = 0.005
@@ -58,7 +68,7 @@ if __name__ == "__main__":
         # "num_gpus_per_worker": 1,
         "env_config": {
             "simTime": simTime,
-            "debug": False,
+            "debug": True,
             "topology": topo_inherit,  # replace to test generalization
             "randomFlow": False,
             "intensity": 1.0,

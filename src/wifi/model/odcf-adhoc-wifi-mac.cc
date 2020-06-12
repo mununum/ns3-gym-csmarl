@@ -34,7 +34,12 @@ ODcfAdhocWifiMac::GetTypeId (void)
   static TypeId tid = TypeId ("ns3::ODcfAdhocWifiMac")
                           .SetParent<AdhocWifiMac> ()
                           .SetGroupName ("Wifi")
-                          .AddConstructor<ODcfAdhocWifiMac> ();
+                          .AddConstructor<ODcfAdhocWifiMac> ()
+                          .AddAttribute ("ODcf",
+                                         "The ODcf object.",
+                                         PointerValue (),
+                                         MakePointerAccessor (&ODcfAdhocWifiMac::GetODcf),
+                                         MakePointerChecker<ODcf> ());
   return tid;
 }
 
@@ -63,6 +68,12 @@ ODcfAdhocWifiMac::ODcfAdhocWifiMac ()
 ODcfAdhocWifiMac::~ODcfAdhocWifiMac ()
 {
   NS_LOG_FUNCTION (this);
+}
+
+Ptr<ODcf>
+ODcfAdhocWifiMac::GetODcf () const
+{
+  return m_odcf;
 }
 
 // void

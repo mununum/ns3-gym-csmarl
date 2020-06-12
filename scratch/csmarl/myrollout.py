@@ -253,7 +253,11 @@ def run(args, parser):
 
     # ray.init(ignore_reinit_error=True)  # SWMOON
 
-    cls = get_agent_class(args.run)
+    if args.run == "CCPPOTrainer":
+        from ns3_centralized_critic import CCTrainer
+        cls = CCTrainer
+    else:
+        cls = get_agent_class(args.run)
     agent = cls(env=args.env, config=config)
     agent.restore(args.checkpoint)
     num_steps = int(args.steps)

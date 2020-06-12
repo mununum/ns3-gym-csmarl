@@ -316,7 +316,7 @@ if __name__ == "__main__":
             "timesteps_total": args.stop,
         },
         config={
-            "env": "ns3_multiagent_env"",
+            "env": "ns3_multiagent_env",
             "batch_mode": "complete_episodes",
             "log_level": "DEBUG" if args.debug else "WARN",
             "env_config": {

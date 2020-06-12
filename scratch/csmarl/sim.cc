@@ -11,6 +11,7 @@
 #include "ns3/node-list.h"
 
 #include "mygym.h"
+#include "mygym-2.h"
 #include "scenario.h"
 
 using namespace ns3;
@@ -91,6 +92,8 @@ main (int argc, char *argv[])
   std::string queueSize = "100p";
   float delayRewardWeight = 0.0;
 
+  bool RC_mode = false;
+
   // define datarates
   std::vector<std::string> dataRates;
   dataRates.push_back ("OfdmRate1_5MbpsBW5MHz");
@@ -119,6 +122,7 @@ main (int argc, char *argv[])
   cmd.AddValue ("randomFlow", "Randomize flows. Default: false", randomFlow);
   cmd.AddValue ("queueSize", "Size of MAC layer buffer. Default: 100p", queueSize);
   cmd.AddValue ("delayRewardWeight", "Weight of delay reward. Default: 0.0", delayRewardWeight);
+  cmd.AddValue ("RC_mode", "Rate Control is enabled in RL, also using different state representation. Default: false", RC_mode);
   cmd.Parse (argc, argv);
 
   NS_LOG_UNCOND ("Ns3Env parameters:");
@@ -234,13 +238,34 @@ main (int argc, char *argv[])
   // Set it to adhoc mode
   Config::SetDefault ("ns3::WifiMacQueue::MaxDelay", TimeValue (Seconds (simulationTime)));
   Config::SetDefault ("ns3::QueueBase::MaxSize", QueueSizeValue (QueueSize (queueSize)));
-  if (algorithm == "odcf")
-    wifiMac.SetType ("ns3::ODcfAdhocWifiMac", "QosSupported", BooleanValue (false));
-  else if (algorithm == "80211" || algorithm == "rl")
-    wifiMac.SetType ("ns3::AdhocWifiMac", "QosSupported", BooleanValue (false));
-  else
-    NS_FATAL_ERROR ("algorithm must be (80211|odcf|rl)");
-  
+
+  if (RC_mode) {
+
+    // rate control is enabled in this RL
+
+    if (algorithm == "80211") {
+      wifiMac.SetType ("ns3::AdhocWifiMac", "QosSupported", BooleanValue (false));
+    } else if (algorithm == "odcf" || algorithm == "rl") {
+      wifiMac.SetType ("ns3::ODcfAdhocWifiMac", "QosSupported", BooleanValue (false));
+      Config::SetDefault ("ns3::QueueBase::MaxSize", QueueSizeValue (QueueSize ("1p")));
+      if (algorithm == "rl") {
+        Config::SetDefault ("ns3::ODcf::RL_mode", BooleanValue (true));
+      }
+    }
+
+  } else {
+
+    if (algorithm == "odcf") {
+      wifiMac.SetType ("ns3::ODcfAdhocWifiMac", "QosSupported", BooleanValue (false));
+      Config::SetDefault ("ns3::QueueBase::MaxSize", QueueSizeValue (QueueSize ("1p")));
+    }
+    else if (algorithm == "80211" || algorithm == "rl")
+      wifiMac.SetType ("ns3::AdhocWifiMac", "QosSupported", BooleanValue (false));
+    else
+      NS_FATAL_ERROR ("algorithm must be (80211|odcf|rl)");
+
+  }
+
 
   // Install wifi device
   NetDeviceContainer devices = wifi.Install (spectrumPhy, wifiMac, nodes);
@@ -343,24 +368,50 @@ main (int argc, char *argv[])
 
   // Configure OpenGym environment
   Ptr<OpenGymInterface> openGymInterface = CreateObject<OpenGymInterface> (openGymPort);
-  Ptr<MyGymEnv> myGymEnv = CreateObject<MyGymEnv> (
-      srcNodes, Seconds (simulationTime), Seconds (envStepTime), algorithm == "rl", continuous, delayRewardWeight, debug);
+  Ptr<MyGymEnv> myGymEnv;
+  Ptr<MyGymEnv2> myGymEnv2;
 
-  myGymEnv->SetOpenGymInterface (openGymInterface);
+  if (RC_mode) {
 
-  // connect TxOkHeader trace source
-  for (uint32_t i = 0; i < nFlows; i++)
-    {
-      Ptr<Node> node = srcNodes.Get (i);
-      Ptr<NetDevice> dev = node->GetDevice (0);
-      Ptr<WifiNetDevice> wifi_dev = DynamicCast<WifiNetDevice> (dev);
-      Ptr<WifiMac> wifi_mac = wifi_dev->GetMac ();
-      Ptr<RegularWifiMac> rmac = DynamicCast<RegularWifiMac> (wifi_mac);
-      rmac->TraceConnectWithoutContext (
-          "TxOkHeader", MakeBoundCallback (&MyGymEnv::SrcTxDone, myGymEnv, node, i));
-      rmac->TraceConnectWithoutContext (
-          "TxErrHeader", MakeBoundCallback (&MyGymEnv::SrcTxFail, myGymEnv, node, i));
-    }
+    myGymEnv2 = CreateObject<MyGymEnv2> (srcNodes, Seconds (simulationTime), Seconds (envStepTime), algorithm, debug);
+
+    myGymEnv2->SetOpenGymInterface (openGymInterface);
+
+    // connect TxOkHeader trace source
+
+    for (uint32_t i = 0; i < nFlows; i++)
+      {
+        Ptr<Node> node = srcNodes.Get (i);
+        Ptr<NetDevice> dev = node->GetDevice (0);
+        Ptr<WifiNetDevice> wifi_dev = DynamicCast<WifiNetDevice> (dev);
+        Ptr<WifiMac> wifi_mac = wifi_dev->GetMac ();
+        Ptr<RegularWifiMac> rmac = DynamicCast<RegularWifiMac> (wifi_mac);
+        rmac->TraceConnectWithoutContext (
+            "TxOkHeader", MakeBoundCallback (&MyGymEnv2::SrcTxDone, myGymEnv2, node, i));
+      }
+
+  } else {
+
+    myGymEnv = CreateObject<MyGymEnv> (
+        srcNodes, Seconds (simulationTime), Seconds (envStepTime), algorithm == "rl", continuous, delayRewardWeight, debug);
+
+    myGymEnv->SetOpenGymInterface (openGymInterface);
+
+    // connect TxOkHeader trace source
+    for (uint32_t i = 0; i < nFlows; i++)
+      {
+        Ptr<Node> node = srcNodes.Get (i);
+        Ptr<NetDevice> dev = node->GetDevice (0);
+        Ptr<WifiNetDevice> wifi_dev = DynamicCast<WifiNetDevice> (dev);
+        Ptr<WifiMac> wifi_mac = wifi_dev->GetMac ();
+        Ptr<RegularWifiMac> rmac = DynamicCast<RegularWifiMac> (wifi_mac);
+        rmac->TraceConnectWithoutContext (
+            "TxOkHeader", MakeBoundCallback (&MyGymEnv::SrcTxDone, myGymEnv, node, i));
+        rmac->TraceConnectWithoutContext (
+            "TxErrHeader", MakeBoundCallback (&MyGymEnv::SrcTxFail, myGymEnv, node, i));
+      }
+
+  }
 
   NS_LOG_UNCOND ("Simulation start");
   Simulator::Stop (Seconds (simulationTime));
@@ -368,7 +419,11 @@ main (int argc, char *argv[])
   NS_LOG_UNCOND ("Simulation stop");
 
   // NS_LOG_UNCOND (myGymEnv->GetTotalPkt ());
-  myGymEnv->PrintResults ();
+  if (RC_mode) {
+    myGymEnv2->PrintResults ();
+  } else {
+    myGymEnv->PrintResults ();
+  }
 
   openGymInterface->NotifySimulationEnd ();
 

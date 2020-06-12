@@ -52,7 +52,12 @@ ODcf::GetTypeId (void)
                          "ending parts of a flow",
                          EnumValue (NONE), MakeEnumAccessor (&ODcf::m_mode),
                          MakeEnumChecker (NONE, "_", JUMP_START, "_js", KEEP_END, "_ke",
-                                          JUMP_START_AND_KEEP_END, "_js_ke"));
+                                          JUMP_START_AND_KEEP_END, "_js_ke"))
+          .AddAttribute ("RL_mode",
+                         "Indicator of whether this odcf module is in RL mode",
+                         BooleanValue (false), 
+                         MakeBooleanAccessor (&ODcf::m_RLmode),
+                         MakeBooleanChecker ());
 
   return tid;
 }
@@ -123,11 +128,36 @@ ODcf::Find (const Mac48Address &to) const
   return 0;
 }
 
+void
+ODcf::SetCw (uint32_t minCw)
+{
+  NS_LOG_FUNCTION (this);
+  NS_ASSERT (m_RLmode == true);
+
+  m_minCw = minCw;
+  m_maxCw = minCw;  // disable BEB
+}
+
+uint32_t
+ODcf::GetMAQLength ()
+{
+  NS_LOG_FUNCTION (this);
+
+  if (m_currentQueue == 0)
+    return 0;
+
+  return m_currentQueue->GetMediaAccessQueueSize ();
+}
+
 uint32_t
 ODcf::GetMinCw ()
 {
   NS_LOG_FUNCTION (this);
   NS_ASSERT (m_currentQueue != 0);
+
+  // if operating in RL mode, then just return current CW
+  if (m_RLmode)
+    return m_minCw;
 
   double transmissionAggressiveness =
       GetTransmissionAggressiveness (m_currentQueue->GetMediaAccessQueueSize ());
@@ -163,6 +193,12 @@ void
 ODcf::UpdateHoldingDuration (uint32_t succCw)
 {
   NS_LOG_FUNCTION (this << succCw);
+
+  if (m_RLmode)
+    {
+      m_currentHoldingDurationInSlot = 0;
+      return;
+    }
 
   if (WillBeFirstImmediateAccess ())
     {

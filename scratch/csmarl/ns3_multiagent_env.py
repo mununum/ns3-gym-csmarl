@@ -43,6 +43,7 @@ class Ns3MultiAgentEnv(MultiAgentEnv):
                    "--algorithm": "rl",
                    "--randomFlow": randomFlow,
                    "--delayRewardWeight": delayRewardWeight,
+                   "--RC_mode": True,
                    "--debug": self.debug}
 
         print("worker {} start".format(self.worker_index)) if self.debug else None

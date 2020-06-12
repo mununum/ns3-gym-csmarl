@@ -7,15 +7,17 @@
 
 namespace ns3 {
 
+class DelayJitterEstimationTimestampTag2;
+
 // A copy of DelayJitterEstimation class for calculating multiple levels of delay
 class DelayJitterEstimation2 : public Object
 {
 public:
-  DelayJitterEstimation2 ();
+  DelayJitterEstimation2 (uint8_t type = 0);
 
-  static void PrepareTx (Ptr<const Packet> packet);
+  static void PrepareTx (Ptr<const Packet> packet, uint8_t type = 0);
 
-  static bool IsMarked (Ptr<const Packet> packet);
+  static bool IsMarked (Ptr<const Packet> packet, uint8_t type = 0);
 
   void RecordRx (Ptr<const Packet> packet);
 
@@ -24,10 +26,14 @@ public:
   uint64_t GetLastJitter (void) const;
 
 private:
+  static bool FindFirstTypeMatchingByteTag (Ptr<const Packet> packet,
+                                            DelayJitterEstimationTimestampTag2 &tag, uint8_t type);
+
   Time m_previousRx; // Previous Rx time
   Time m_previousRxTx; // Previous Rx or Tx time
   int64x64_t m_jitter; // Jitter estimation
   Time m_delay; // Delay estimation
+  uint8_t m_type; // type of this instance
 };
 
 } // namespace ns3

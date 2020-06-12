@@ -3,6 +3,7 @@
 #include "ns3/uinteger.h"
 #include "ns3/enum.h"
 #include "ns3/simulator.h"
+#include "ns3/delay-jitter-estimation-2.h"
 
 #undef NS_LOG_APPEND_CONTEXT
 #define NS_LOG_APPEND_CONTEXT                              \
@@ -118,6 +119,7 @@ ODcfQueue::EnqueueToMediaAccessQueue ()
     }
   else
     {
+      DelayJitterEstimation2::PrepareTx (packet, 1);
       m_mediaAccessQueue->Enqueue (packet);
       NS_LOG_LOGIC ("A packet at CQ was inserted at MAQ");
 

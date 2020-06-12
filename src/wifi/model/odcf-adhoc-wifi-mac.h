@@ -28,6 +28,8 @@ protected:
   // void DoStart ();
   // void DoDispose ();
 
+  Ptr<ODcf> GetODcf () const;
+
   Ptr<ODcfTxop> m_odcfTxop;
   Ptr<ODcf> m_odcf;
 };

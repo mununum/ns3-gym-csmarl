@@ -59,7 +59,7 @@ ODcfAdhocWifiMac::ODcfAdhocWifiMac ()
   m_odcfTxop->SetTxFailedCallback (MakeCallback (&ODcfAdhocWifiMac::TxFailed, this));
   m_odcfTxop->SetTxDroppedCallback (MakeCallback (&ODcfAdhocWifiMac::NotifyTxDrop, this));
 
-  m_odcf = CreateObject<ODcf> (this, m_odcfTxop, m_txop->GetMaxCw ());
+  m_odcf = CreateObject<ODcf> (this, m_odcfTxop, m_txop->GetMinCw (), m_txop->GetMaxCw ());
 
   // Let the lower layers know that we are acting in an IBSS
   SetTypeOfStation (ADHOC_STA);

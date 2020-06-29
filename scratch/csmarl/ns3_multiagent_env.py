@@ -25,6 +25,7 @@ class Ns3MultiAgentEnv(MultiAgentEnv):
         traffic = env_config.get("traffic", "cbr")
         intensity = env_config.get("intensity", 1)
         delayRewardWeight = env_config.get("delayRewardWeight", 0.0)
+        randomIntensity = env_config.get("randomIntensity", False)
 
         self.debug = env_config.get("debug", False)
         simTime_default = 1 if self.debug else 20
@@ -42,6 +43,7 @@ class Ns3MultiAgentEnv(MultiAgentEnv):
                    "--intensity": intensity,
                    "--algorithm": "rl",
                    "--randomFlow": randomFlow,
+                   "--randomIntensity": randomIntensity,
                    "--delayRewardWeight": delayRewardWeight,
                    "--RC_mode": True,
                    "--debug": self.debug}
@@ -63,14 +65,23 @@ class Ns3MultiAgentEnv(MultiAgentEnv):
         return {i: multi_obs[i] for i in range(self.n_agents)}
 
     def info_to_rew(self, info):
-        return {int(kv.split('=')[0]): float(kv.split('=')[1])
-                for kv in info.split()}
+        reward = {}
+        for kv in info.split():
+            k, v = kv.split('=')
+            if k.startswith("reward"):  # "reward_*" keys
+                index = int(k.split('_')[1])
+                reward[index] = float(v)
+        return reward
+        # return {int(kv.split('=')[0]): float(kv.split('=')[1])
+        #         for kv in info.split()}
 
     def parse_info(self, info, obs, state):
 
         common_info = {"state": np.array(state)}  # for centralized critic
         for kv in info.split():
             k, v = kv.split('=')
+            if k.startswith("reward"):  # ignore "reward_*" keys
+                continue
             common_info[k] = float(v)
 
         ret = {}
@@ -83,6 +94,13 @@ class Ns3MultiAgentEnv(MultiAgentEnv):
                 "loss_rate": o[3],
                 "common": common_info,
             }
+
+        # log the individual rewards if exist
+        for kv in info.split():
+            k, v = kv.split('=')
+            if k.startswith("reward"):
+                index = int(k.split('_')[1])
+                ret[index]["reward"] = float(v)
 
         return ret
 
@@ -135,6 +153,8 @@ def on_episode_end(info):
     episode = info["episode"]
     for k, v in episode.user_data.items():
         if "tx_rate" in k:
+            agg = np.sum(v)
+        elif k.startswith("reward"):
             agg = np.sum(v)
         else:
             # MYTODO np.mean is not technically correct at this point

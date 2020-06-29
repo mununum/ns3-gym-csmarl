@@ -97,7 +97,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--debug", help="debug indicator, default false", type=bool, default=False)
     parser.add_argument(
-        "--topology", help="topology to train, default complex", type=str, default="complex")
+        "--topology", help="topology to train, default complex", type=str, default="fim")
     parser.add_argument(
         "--delayRewardWeight", help="weight of delay reward, default 0.0", type=float, default=0.0)
 
@@ -108,13 +108,13 @@ if __name__ == "__main__":
     cwd = os.path.dirname(os.path.abspath(__file__))
 
     NUM_GPUS = 4
-    num_workers = 8
+    num_workers = 16
 
     if args.debug:
         params_list = [0]
     else:
         params_list = [0]
-        # params_list = [5e-4, 5e-5, 5e-6, 5e-7]  # for parameter testing
+        # params_list = [5e-4, 5e-5]  # for parameter testing
 
     num_samples = 1
     
@@ -133,14 +133,16 @@ if __name__ == "__main__":
             "env_config": {
                 "cwd": cwd,
                 "debug": args.debug,
-                "reward": "shared",
+                "reward": "indiv",
                 "topology": args.topology,
                 "delayRewardWeight": args.delayRewardWeight,
                 "traffic": "cbr",
                 "randomFlow": True if args.topology == "complex" else False,
+                "randomIntensity": False,
             },
             "num_workers": 0 if args.debug else num_workers,
             "num_gpus_per_worker": num_gpus_per_worker,
+            # "lr": tune.grid_search(params_list),
             "lr": 5e-4,
             # "lr": 5e-4 if args.debug else tune.grid_search(params_list),
             "use_gae": True,

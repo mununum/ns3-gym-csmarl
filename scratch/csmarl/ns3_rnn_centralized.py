@@ -95,10 +95,9 @@ class CentralizedCriticRNNModel(RecurrentTFModelV2):
         #     outputs=[logits, values, state_h, state_c])
 
         self.register_variables(self.rnn_model.variables)
-        self.rnn_model.summary()  # dump the model info
+        # self.rnn_model.summary()  # dump the model info
 
         ### VALUE NETWORK ###
-
 
         obs = tf.keras.layers.Input(
             shape=(self.obs_dim,), name="obs")
@@ -112,6 +111,7 @@ class CentralizedCriticRNNModel(RecurrentTFModelV2):
         #     axis=1)([obs, state, other_act, agent_id])  # with agent_id
         concat_input = tf.keras.layers.Concatenate(
             axis=1)([obs, state, other_act])  # without agent_id
+        # concat_input = state # state only
         central_vf_dense = tf.keras.layers.Dense(
             hiddens_size, activation=tf.nn.tanh, name="c_vf_dense")(concat_input)
         central_vf_out = tf.keras.layers.Dense(
@@ -146,6 +146,8 @@ class CentralizedCriticRNNModel(RecurrentTFModelV2):
     def value_function(self):
         return tf.reshape(self._dummy_value_out, [-1])
 
+ModelCatalog.register_custom_model(
+    "cc_rnn_model", CentralizedCriticRNNModel)
 
 if __name__ == "__main__":
 
@@ -161,10 +163,7 @@ if __name__ == "__main__":
 
     # MYTODO: make it configurable
     cwd = os.path.dirname(os.path.abspath(__file__))
-    topology = "complex"
-
-    ModelCatalog.register_custom_model(
-        "cc_rnn_model", CentralizedCriticRNNModel)
+    topology = "fim"
 
     config_params = [0]
     env_config = {  # environment configuration
@@ -173,19 +172,20 @@ if __name__ == "__main__":
         "reward": "shared",
         "topology": topology,
         "traffic": "cbr",
+        "randomIntensity": False,
     }
     # config_params = [FILL]  # for env config testing
     # env_config = tune.grid_search(config_params)
 
 
     NUM_GPUS = 4
-    num_workers = 16
+    num_workers = 8
 
     if args.debug:
         params_list = [0]
     else:
         params_list = [0]
-        # params_list = [5e-4, 5e-5, 5e-6, 5e-7]  # for parameter testing
+        # params_list = [5e-4, 5e-5]  # for parameter testing
         # params_list = [1, 0.8, 0.5, 0]
 
     num_samples = 1
@@ -210,7 +210,7 @@ if __name__ == "__main__":
             "lr": 5e-4,
             # "lr": 5e-4 if args.debug else tune.grid_search(params_list),
             # "lambda": 1 if args.debug else tune.grid_search(params_list),
-            "use_gae": False,
+            "use_gae": True,
             "sgd_minibatch_size": 2000,
             "model": {
                 "custom_model": "cc_rnn_model",
@@ -226,4 +226,7 @@ if __name__ == "__main__":
             }
         },
         num_samples=1 if args.debug else num_samples,
+        checkpoint_freq=10,
+        keep_checkpoints_num=1,
+        checkpoint_score_attr="episode_reward_mean",
     )

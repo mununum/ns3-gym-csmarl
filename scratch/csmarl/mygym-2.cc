@@ -4,6 +4,7 @@
 #include "ns3/wifi-module.h"
 #include "ns3/node-list.h"
 #include "ns3/log.h"
+#include "ns3/delay-jitter-estimation.h"
 #include "ns3/delay-jitter-estimation-2.h"
 
 namespace ns3 {
@@ -11,6 +12,21 @@ namespace ns3 {
 NS_LOG_COMPONENT_DEFINE ("MyGymEnv2");
 
 NS_OBJECT_ENSURE_REGISTERED (MyGymEnv2);
+
+static inline double
+updateEwma (uint64_t &value, uint64_t &lastValue, double &ewmaValue, const double ewmaWeight)
+{
+  double currentValue = value - lastValue;
+  if (lastValue == 0)
+    {
+      ewmaValue = currentValue;
+    }
+  else
+    {
+      ewmaValue = ewmaWeight * ewmaValue + (1 - ewmaWeight) * currentValue;
+    }
+  return ewmaValue;
+}
 
 class MyGymNodeState : public Object
 {
@@ -20,29 +36,45 @@ public:
   MyGymNodeState ()
       : m_txPktNum (0),
         m_txPktNumLastVal (0),
+        m_txPktNumEwma (0.0),
+        m_tempReward (0.0),
+        m_currentReward (0.0),
         m_queueLength (0),
-        m_delaySum (Seconds (0.0)),
-        m_delayEwma (0),
-        m_delay_estimator (CreateObject<DelayJitterEstimation2> (1))
+        m_e2eDelaySum (Seconds (0.0)),
+        m_e2eDelayEwma (0.0),
+        m_HOLDelayEwma (0.0),
+        m_delay_estimator (CreateObject<DelayJitterEstimation> ()),
+        m_delay_estimator_2 (CreateObject<DelayJitterEstimation2> (1))
   {
   }
 
   void
   Step ()
   {
+    updateEwma (m_txPktNum, m_txPktNumLastVal, m_txPktNumEwma, 0.9);
     m_txPktNumLastVal = m_txPktNum;
+
+    m_tempReward = 0.0;
+    m_currentReward = 0.0;
   }
 
 private:
   uint64_t m_txPktNum;
   uint64_t m_txPktNumLastVal;
 
+  double m_txPktNumEwma;
+
+  float m_tempReward;
+  float m_currentReward;
+
   uint32_t m_queueLength;
 
-  Time m_delaySum;
-  double m_delayEwma;
+  Time m_e2eDelaySum;
+  double m_e2eDelayEwma;
+  double m_HOLDelayEwma;
 
-  Ptr<DelayJitterEstimation2> m_delay_estimator; // for MAQ delay
+  Ptr<DelayJitterEstimation> m_delay_estimator;  // for HOL delay
+  Ptr<DelayJitterEstimation2> m_delay_estimator_2; // for MAQ delay
 };
 
 MyGymEnv2::MyGymEnv2 ()
@@ -70,6 +102,7 @@ MyGymEnv2::MyGymEnv2 (NodeContainer agents, Time simTime, Time stepTime, std::st
   m_debug = debug;
 
   m_reward_sum = 0.0;
+  m_reward_indiv_sum = 0.0;
 
   uint32_t numAgents = m_agents.GetN ();
   for (uint32_t i = 0; i < numAgents; i++)
@@ -233,9 +266,17 @@ MyGymEnv2::GetObservation ()
       double qlen = GetQueueLength (node);
       m_agent_state[i]->m_queueLength = qlen;
 
-      // Latency
-      double lat = m_agent_state[i]->m_delayEwma;
-      lat /= 1e9;  // latency unit: sec
+      // AvgThpt
+      double avg_thpt = m_agent_state[i]->m_txPktNumEwma;
+      avg_thpt /= 1000;
+
+      // e2e latency
+      // double lat = m_agent_state[i]->m_e2eDelayEwma;
+      // lat /= 1e9; // latency unit: sec
+
+      // HOL latency
+      double lat = m_agent_state[i]->m_HOLDelayEwma;
+      lat /= 1e9; // latency unit: sec
 
       // Loss%
       Ptr<NetDevice> dev = node->GetDevice (0);
@@ -244,22 +285,19 @@ MyGymEnv2::GetObservation ()
       double err_rate = rman->GetAggInfo ().GetFrameErrorRate ();
 
       // CW
-      Ptr<WifiMac> wifi_mac = wifi_dev->GetMac ();
-      Ptr<RegularWifiMac> rmac = DynamicCast<RegularWifiMac> (wifi_mac);
-      PointerValue ptr;
-      rmac->GetAttribute ("Txop", ptr);
-      Ptr<Txop> txop = ptr.Get<Txop> ();
-      double mincw = txop->GetMinCw ();
+      double mincw = GetCw (node);
 
       // put it in a box
       box->AddValue (thpt);
-      box->AddValue (qlen);
+      // box->AddValue (qlen);
+      box->AddValue (avg_thpt);
       box->AddValue (lat);
       box->AddValue (err_rate);
       box->AddValue (mincw);
 
       if (m_debug)
         std::cout << qlen << "\t";
+        // std::cout << thpt << "\t" << qlen << "\t" << lat << "\t" << err_rate << "\t" << mincw << std::endl;
     }
 
   if (m_debug)
@@ -273,16 +311,60 @@ MyGymEnv2::GetReward ()
 {
   NS_LOG_FUNCTION (this);
 
-  const double reward_scale = 1e5;
+  const double queue_reward_scale = 1e2;
+  const double utility_reward_scale = 10;
+  const double reward_scale = 1e3;
+  const double epsilon = 5e-5;
+  const double lower_bound = 0.1;
 
   uint32_t numAgents = m_agents.GetN ();
   float reward = 0.0;
+  float queue_reward = 0.0;
+  float utility_reward = 0.0, utility_reward_min = 0.0;
 
+  // shared reward
+  utility_reward_min = std::log (lower_bound);
   for (uint32_t i = 0; i < numAgents; i++)
     {
-      reward -= m_agent_state[i]->m_queueLength;
+      double avg_rate = m_agent_state[i]->m_txPktNumEwma;
+      utility_reward += std::log (avg_rate + epsilon);
+      // utility_reward_min += std::log (lower_bound);
+
+      m_agent_state[i]->m_tempReward = std::log (avg_rate + epsilon);
+
+      queue_reward -= m_agent_state[i]->m_queueLength;
     }
-  
+  utility_reward = std::max (utility_reward, utility_reward_min);
+
+  // individual reward; MYTODO generalize
+  {
+    // graph relationship
+    m_agent_state[0]->m_currentReward = m_agent_state[0]->m_tempReward + 0.5 * m_agent_state[1]->m_tempReward;
+    m_agent_state[1]->m_currentReward = m_agent_state[0]->m_tempReward + m_agent_state[1]->m_tempReward + m_agent_state[2]->m_tempReward;
+    m_agent_state[2]->m_currentReward = 0.5 * m_agent_state[1]->m_tempReward + m_agent_state[2]->m_tempReward;
+
+    m_agent_state[0]->m_currentReward = std::max (m_agent_state[0]->m_currentReward, utility_reward_min);
+    m_agent_state[1]->m_currentReward = std::max (m_agent_state[1]->m_currentReward, utility_reward_min);
+    m_agent_state[2]->m_currentReward = std::max (m_agent_state[2]->m_currentReward, utility_reward_min);
+
+    m_agent_state[0]->m_currentReward *= utility_reward_scale / reward_scale;
+    m_agent_state[1]->m_currentReward *= utility_reward_scale / reward_scale;
+    m_agent_state[2]->m_currentReward *= utility_reward_scale / reward_scale;
+
+    m_reward_indiv_sum += m_agent_state[0]->m_currentReward;
+    m_reward_indiv_sum += m_agent_state[1]->m_currentReward;
+    m_reward_indiv_sum += m_agent_state[2]->m_currentReward;
+  }
+
+  m_queue_reward = queue_reward / queue_reward_scale;
+  m_utility_reward = utility_reward * utility_reward_scale;
+
+  // if (m_useShortReward)
+  //   reward = m_utility_reward;  // short_term_utility
+  // else
+  //   reward = m_queue_reward;
+  reward = m_utility_reward;
+
   reward /= reward_scale;
   NS_LOG_DEBUG ("MyGetReward: " << reward);
 
@@ -295,7 +377,17 @@ std::string
 MyGymEnv2::GetExtraInfo ()
 {
   NS_LOG_FUNCTION (this);
-  std::string myInfo = "a=1";
+  std::string myInfo = "";
+
+  // report individual rewards
+  uint32_t numAgents = m_agents.GetN ();
+  for (uint32_t i = 0; i < numAgents; i++)
+    {
+      myInfo += "reward_" + std::to_string(i) + "=" + std::to_string(m_agent_state[i]->m_currentReward) + " ";
+    }
+
+  myInfo += "queue_reward=" + std::to_string (m_queue_reward) + " ";
+  myInfo += "utility_reward=" + std::to_string (m_utility_reward);
 
   return myInfo;
 }
@@ -313,6 +405,32 @@ MyGymEnv2::SetCw (Ptr<Node> node, uint32_t cwValue)
   Ptr<ODcf> odcf = ptr.Get<ODcf> ();
 
   odcf->SetCw (cwValue);
+}
+
+uint32_t
+MyGymEnv2::GetCw (Ptr<Node> node)
+{
+  Ptr<NetDevice> dev = node->GetDevice (0);
+  Ptr<WifiNetDevice> wifi_dev = DynamicCast<WifiNetDevice> (dev);
+  Ptr<WifiMac> wifi_mac = wifi_dev->GetMac ();
+  if (m_algorithm == IEEE80211)
+    {
+      // 80211: refer to Txop object
+      Ptr<RegularWifiMac> rmac = DynamicCast<RegularWifiMac> (wifi_mac);
+      PointerValue ptr;
+      rmac->GetAttribute ("Txop", ptr);
+      Ptr<Txop> txop = ptr.Get<Txop> ();
+      return txop->GetMinCw ();
+    }
+  else
+    {
+      // ODCF/RL: refer to ODcf object
+      Ptr<ODcfAdhocWifiMac> odcf_mac = DynamicCast<ODcfAdhocWifiMac> (wifi_mac);
+      PointerValue ptr;
+      odcf_mac->GetAttribute ("ODcf", ptr);
+      Ptr<ODcf> odcf = ptr.Get<ODcf> ();
+      return odcf->GetCw ();
+    }
 }
 
 bool
@@ -334,7 +452,12 @@ MyGymEnv2::ExecuteActions (Ptr<OpenGymDataContainer> actions)
       uint32_t exponent = action->GetValue ();
       uint32_t cwSize = std::pow (base, exponent) - 1;
       SetCw (node, cwSize);
+
+      // if (m_debug)
+      //   std::cout << exponent << "\t";
     }
+  // if (m_debug)
+  //   std::cout << std::endl;
 
   return true;
 }
@@ -349,18 +472,29 @@ MyGymEnv2::SrcTxDone (Ptr<MyGymEnv2> entity, Ptr<Node> node, uint32_t idx, const
       Ptr<MyGymNodeState> state = entity->m_agent_state[idx];
       state->m_txPktNum++;
 
-      state->m_delay_estimator->RecordRx (packet); // MAQ delay
+      state->m_delay_estimator->RecordRx (packet);  // HOL delay
+      state->m_delay_estimator_2->RecordRx (packet); // MAQ delay
 
-      Time delay = state->m_delay_estimator->GetLastDelay ();
+      Time HOLDelay = state->m_delay_estimator->GetLastDelay ();
+      Time e2eDelay = state->m_delay_estimator_2->GetLastDelay ();
 
+      // EWMA update the HOL delay
       const double ewmaWeight = 0.9;
       if (state->m_txPktNum == 1)
-        state->m_delayEwma = delay.GetDouble ();
+        state->m_HOLDelayEwma = HOLDelay.GetDouble ();
       else
-        state->m_delayEwma =
-            ewmaWeight * state->m_delayEwma + (1 - ewmaWeight) * delay.GetDouble ();
+        state->m_HOLDelayEwma =
+            ewmaWeight * state->m_HOLDelayEwma + (1 - ewmaWeight) * HOLDelay.GetDouble ();
 
-      state->m_delaySum += delay;
+      // EWMA update the e2e delay
+      if (state->m_txPktNum == 1)
+        state->m_e2eDelayEwma = e2eDelay.GetDouble ();
+      else
+        state->m_e2eDelayEwma =
+            ewmaWeight * state->m_e2eDelayEwma + (1 - ewmaWeight) * e2eDelay.GetDouble ();
+
+      // e2e delay statistic for performance measurement
+      state->m_e2eDelaySum += e2eDelay;
     }
 }
 
@@ -371,16 +505,19 @@ MyGymEnv2::PrintResults (void)
 
   double delaySum = 0.0;
   uint64_t pktSum = 0;
+  std::cout << "average throughput" << std::endl;
   for (uint32_t i = 0; i < numAgents; i++)
     {
-      std::cout << m_agent_state[i]->m_txPktNum << ", ";
-      delaySum += m_agent_state[i]->m_delaySum.GetDouble ();
+      std::cout << m_agent_state[i]->m_txPktNum << "\t";
+      delaySum += m_agent_state[i]->m_e2eDelaySum.GetDouble ();
       pktSum += m_agent_state[i]->m_txPktNum;
     }
   std::cout << std::endl;
 
-  std::cout << "average end-to-end latency: " << delaySum / pktSum / 1e6 << " ms" << std::endl; // milliseconds
+  std::cout << "average end-to-end latency: " << delaySum / pktSum / 1e6 << " ms"
+            << std::endl; // milliseconds
   std::cout << "episode_reward: " << m_reward_sum * numAgents << std::endl;
+  std::cout << "episode_reward_indiv: " << m_reward_indiv_sum << std::endl;
 }
 
 } // namespace ns3

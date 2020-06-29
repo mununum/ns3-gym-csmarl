@@ -68,7 +68,7 @@ main (int argc, char *argv[])
   // Parameters of the environment
   uint32_t simSeed = 0;
   double simulationTime = 20; // seconds
-  double envStepTime = 0.02; // seconds, ns3gym env step time interval
+  double envStepTime = 0.005; // seconds, ns3gym env step time interval
   uint32_t openGymPort = 5555;
   bool debug = true;
 
@@ -88,11 +88,12 @@ main (int argc, char *argv[])
   bool enabledMinstrel = false;
 
   bool randomFlow = false;
+  bool randomIntensity = false;
 
   std::string queueSize = "100p";
   float delayRewardWeight = 0.0;
 
-  bool RC_mode = false;
+  bool RC_mode = true;
 
   // define datarates
   std::vector<std::string> dataRates;
@@ -112,7 +113,7 @@ main (int argc, char *argv[])
   cmd.AddValue ("simSeed", "Seed for random generator. Default: 0", simSeed);
   // optional parameters
   cmd.AddValue ("simTime", "Simulation time in seconds, Default: 20s", simulationTime);
-  cmd.AddValue ("stepTime", "Step time of the environment, Default: 0.02s", envStepTime);
+  cmd.AddValue ("stepTime", "Step time of the environment, Default: 0.005s", envStepTime);
   cmd.AddValue ("topology", "Interference topology. (on graph file), Default: fim", topology);
   cmd.AddValue ("algorithm", "MAC algorithm to use (80211|odcf|rl). Default: 80211", algorithm);
   cmd.AddValue ("continuous", "Use continuous action space. Default: false", continuous);
@@ -120,9 +121,10 @@ main (int argc, char *argv[])
   cmd.AddValue ("traffic", "Traffic type (cbr|mmpp). Default: cbr", traffic);
   cmd.AddValue ("intensity", "Intensity of the traffic. Default: 1.0", intensity);
   cmd.AddValue ("randomFlow", "Randomize flows. Default: false", randomFlow);
+  cmd.AddValue ("randomIntensity", "Randomize intensity. Default: false", randomIntensity);
   cmd.AddValue ("queueSize", "Size of MAC layer buffer. Default: 100p", queueSize);
   cmd.AddValue ("delayRewardWeight", "Weight of delay reward. Default: 0.0", delayRewardWeight);
-  cmd.AddValue ("RC_mode", "Rate Control is enabled in RL, also using different state representation. Default: false", RC_mode);
+  cmd.AddValue ("RC_mode", "Rate Control is enabled in RL, also using different state representation. Default: true", RC_mode);
   cmd.Parse (argc, argv);
 
   NS_LOG_UNCOND ("Ns3Env parameters:");
@@ -284,6 +286,16 @@ main (int argc, char *argv[])
 
   // Configure ARP cache
   PopulateArpCache ();
+
+  // Randomize intensity if specified
+  if (randomIntensity)
+    {
+      // homogeneous random intensity
+      Ptr<UniformRandomVariable> u = CreateObject<UniformRandomVariable> ();
+      u->SetAttribute ("Min", DoubleValue (0));
+      u->SetAttribute ("Max", DoubleValue (1));
+      intensity = u->GetValue ();
+    }
 
   uint16_t port = 1000;
   NodeContainer srcNodes;

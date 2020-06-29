@@ -69,14 +69,15 @@ ODcf::ODcf ()
   NS_ASSERT (false);
 }
 
-ODcf::ODcf (Ptr<ODcfAdhocWifiMac> mac, Ptr<ODcfTxop> txop, uint32_t maxCw)
+ODcf::ODcf (Ptr<ODcfAdhocWifiMac> mac, Ptr<ODcfTxop> txop, uint32_t minCw, uint32_t maxCw)
     : m_mac (mac),
       m_txop (txop),
       m_maxCw (maxCw),
       m_currentQueue (0),
       m_currentTransmissionIntensity (0),
       m_currentHoldingDurationInSlot (0),
-      m_isHolding (false)
+      m_isHolding (false),
+      m_minCw (minCw)
 {
   NS_LOG_FUNCTION (this << mac << txop << maxCw);
 
@@ -136,6 +137,14 @@ ODcf::SetCw (uint32_t minCw)
 
   m_minCw = minCw;
   m_maxCw = minCw;  // disable BEB
+}
+
+uint32_t
+ODcf::GetCw ()
+{
+  NS_LOG_FUNCTION (this);
+
+  return m_minCw;
 }
 
 uint32_t

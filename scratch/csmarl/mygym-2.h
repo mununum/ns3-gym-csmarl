@@ -15,7 +15,8 @@ public:
   enum Algorithm { IEEE80211, O_DCF, RL };
 
   MyGymEnv2 (); // for typeid registration
-  MyGymEnv2 (NodeContainer agents, Time simTime, Time stepTime, std::string algorithm, bool debug);
+  MyGymEnv2 (NodeContainer agents, Time simTime, Time stepTime, std::string algorithm,
+             bool debug);
 
   virtual ~MyGymEnv2 ();
   static TypeId GetTypeId (void);
@@ -39,6 +40,7 @@ private:
   void ScheduleNextStateRead ();
   void StepState ();
   void SetCw (Ptr<Node> node, uint32_t cwValue);
+  uint32_t GetCw (Ptr<Node> node);
 
   uint32_t GetQueueLength (Ptr<Node> node);
 
@@ -53,6 +55,10 @@ private:
   bool m_debug;
 
   double m_reward_sum;
+  double m_reward_indiv_sum;
+
+  float m_queue_reward;
+  float m_utility_reward;
 
   uint32_t m_perAgentObsDim;
 };

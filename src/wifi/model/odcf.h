@@ -32,7 +32,7 @@ public:
   static TypeId GetTypeId (void);
 
   ODcf ();
-  ODcf (Ptr<ODcfAdhocWifiMac> mac, Ptr<ODcfTxop> txop, uint32_t maxCw);
+  ODcf (Ptr<ODcfAdhocWifiMac> mac, Ptr<ODcfTxop> txop, uint32_t minCw, uint32_t maxCw);
   virtual ~ODcf ();
 
   void Enqueue (Ptr<Packet> packet, const Mac48Address& to);
@@ -49,6 +49,7 @@ public:
   Mac48Address GetAddress () const;
 
   void SetCw (uint32_t minCw);  // called by RL agent
+  uint32_t GetCw ();
   uint32_t GetMAQLength ();
 
 private:

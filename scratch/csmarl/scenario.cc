@@ -83,10 +83,75 @@ ConfigureMatrixTopology (Ptr<MultiModelSpectrumChannel> spectrumChannel, NodeCon
 }
 
 void
-ReadGraph (std::string topology, uint32_t &nNodes, uint32_t &nEdges, uint32_t &nFlows,
-           std::vector<std::tuple<float, float>> &pos,
-           std::vector<std::tuple<uint32_t, uint32_t>> &edges,
-           std::vector<std::tuple<uint32_t, uint32_t>> &flows)
+ReadLinkGraph (std::string topology, uint32_t &nNodes, uint32_t &nEdges, uint32_t &nFlows,
+               std::vector<std::tuple<float, float>> &pos,
+               std::vector<std::tuple<uint32_t, uint32_t>> &edges, // interferences between nodes
+               std::vector<std::tuple<uint32_t, uint32_t>> &flows,
+               std::map<uint32_t, std::set<uint32_t>> &neighbors,
+               std::map<uint32_t, uint32_t> &degree)
+{
+  std::ifstream graph_file;
+  std::string graph_file_name = "scratch/csmarl/graphs/" + topology + ".txt";
+  std::set<std::tuple<uint32_t, uint32_t>> edgeSet;
+
+  graph_file.open (graph_file_name);
+  if (graph_file.fail ())
+    {
+      NS_FATAL_ERROR ("File " << graph_file_name << " not found");
+    }
+  graph_file >> nFlows;
+  // in link graph case, nNodes is always equal to nFlows * 2
+  nNodes = nFlows * 2;
+  for (uint32_t i = 0; i < nFlows; i++)
+    {
+      float a, b;
+      graph_file >> a >> b;
+      // sender and receiver in identical locations
+      pos.push_back (std::make_tuple (a, b));
+      pos.push_back (std::make_tuple (a, b));
+
+      // establish a link between tx and rx
+      uint32_t tx = i * 2;
+      uint32_t rx = i * 2 + 1;
+      edgeSet.insert (std::make_tuple (tx, rx));
+      flows.push_back (std::make_tuple (tx, rx));
+    }
+  
+  uint32_t nInterferences; // interferences between links
+  graph_file >> nInterferences;
+  for (uint32_t i = 0; i < nInterferences; i++)
+    {
+      uint32_t a, b;
+      graph_file >> a >> b;
+
+      uint32_t a_tx = a * 2;
+      uint32_t a_rx = a * 2 + 1;
+      uint32_t b_tx = b * 2;
+      uint32_t b_rx = b * 2 + 1;
+
+      edgeSet.insert (std::make_tuple (a_tx, b_tx));
+      edgeSet.insert (std::make_tuple (a_tx, b_rx));
+      edgeSet.insert (std::make_tuple (a_rx, b_tx));
+      edgeSet.insert (std::make_tuple (a_rx, b_rx));
+
+      // add neighbors
+      neighbors[a].insert (b);
+      neighbors[b].insert (a);
+      degree[a]++;
+      degree[b]++;
+    }
+  graph_file.close ();
+
+  // copy set to vector
+  nEdges = edgeSet.size ();
+  std::copy (edgeSet.begin (), edgeSet.end (), std::back_inserter (edges));
+}
+
+void
+ReadNodeGraph (std::string topology, uint32_t &nNodes, uint32_t &nEdges, uint32_t &nFlows,
+               std::vector<std::tuple<float, float>> &pos,
+               std::vector<std::tuple<uint32_t, uint32_t>> &edges,
+               std::vector<std::tuple<uint32_t, uint32_t>> &flows)
 {
   std::ifstream graph_file;
   std::string graph_file_name = "scratch/csmarl/graphs/" + topology + ".txt";

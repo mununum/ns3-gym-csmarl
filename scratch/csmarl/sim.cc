@@ -157,13 +157,27 @@ main (int argc, char *argv[])
   std::vector<std::tuple<uint32_t, uint32_t>> edges;
   std::vector<std::tuple<uint32_t, uint32_t>> flows;
 
+  // for local reward calculation
+  std::map<uint32_t, std::set<uint32_t>> neighbors;
+  std::map<uint32_t, uint32_t> degree;
+  std::map<uint32_t, double> neiInvDegSum;
+
+  // read node graph
   // read a graph file and assign values to nNodes, nEdges, nFlows
   // pos, edges, flows
-  ReadGraph (topology, nNodes, nEdges, nFlows, pos, edges, flows);
+  // ReadNodeGraph (topology, nNodes, nEdges, nFlows, pos, edges, flows);
 
   // When enabled, generate randomized flow for this example.
-  if (randomFlow)
-    MakeFlows (nNodes, nEdges, nFlows, edges, flows, simSeed);
+  // if (randomFlow)
+  //   MakeFlows (nNodes, nEdges, nFlows, edges, flows, simSeed);
+
+  // read link graph
+  ReadLinkGraph (topology, nNodes, nEdges, nFlows, pos, edges, flows, neighbors, degree);
+
+  // calculate neiInvDegSum
+  for (uint32_t i = 0; i < nNodes; i++)
+    for (auto it = neighbors[i].begin (); it != neighbors[i].end (); it++)
+      neiInvDegSum[i] += 1.0 / degree[*it];
 
   // Configuration of the scenario
   // Create Nodes
@@ -385,7 +399,7 @@ main (int argc, char *argv[])
 
   if (RC_mode) {
 
-    myGymEnv2 = CreateObject<MyGymEnv2> (srcNodes, Seconds (simulationTime), Seconds (envStepTime), algorithm, debug);
+    myGymEnv2 = CreateObject<MyGymEnv2> (srcNodes, Seconds (envStepTime), algorithm, neighbors, degree, neiInvDegSum, debug);
 
     myGymEnv2->SetOpenGymInterface (openGymInterface);
 

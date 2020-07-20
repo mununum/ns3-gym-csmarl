@@ -5,6 +5,13 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "Python: Current File",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal"
+        },
+        {
             "name": "(gdb) Launch from scratch",
             "type": "cppdbg",
             "request": "launch",
@@ -27,13 +34,16 @@
                     "ignoreFailures": true
                 }
             ]
-         },
-         {
+        },
+        {
             "name": "(gdb) csmarl",
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/build/scratch/csmarl/csmarl",
-            "args": ["--topology=single", "--algorithm=80211"],
+            "args": [
+                "--topology=single",
+                "--algorithm=80211"
+            ],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "environment": [
@@ -51,13 +61,15 @@
                     "ignoreFailures": true
                 }
             ]
-         },
-         {
+        },
+        {
             "name": "(gdb) flow-in-the-middle",
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/build/scratch/flow-in-the-middle",
-            "args": [""],
+            "args": [
+                ""
+            ],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "environment": [
@@ -75,6 +87,6 @@
                     "ignoreFailures": true
                 }
             ]
-         }
+        }
     ]
 }

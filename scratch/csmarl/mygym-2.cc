@@ -82,13 +82,15 @@ MyGymEnv2::MyGymEnv2 ()
   NS_LOG_FUNCTION (this);
 }
 
-MyGymEnv2::MyGymEnv2 (NodeContainer agents, Time simTime, Time stepTime, std::string algorithm,
+MyGymEnv2::MyGymEnv2 (NodeContainer agents, Time stepTime, std::string algorithm,
+                      std::map<uint32_t, std::set<uint32_t>> neighbors,
+                      std::map<uint32_t, uint32_t> degree,
+                      std::map<uint32_t, double> neiInvDegSum,
                       bool debug = false)
 {
   NS_LOG_FUNCTION (this);
   m_agents = agents;
-  m_simTime = simTime;
-  m_interval = stepTime;
+  m_stepTime = stepTime;
 
   if (algorithm == "80211")
     m_algorithm = IEEE80211;
@@ -112,6 +114,10 @@ MyGymEnv2::MyGymEnv2 (NodeContainer agents, Time simTime, Time stepTime, std::st
 
   m_perAgentObsDim = 5; // Throughput, QueueLength, e2e Latency, Loss%, CW
 
+  m_neighbors = neighbors;
+  m_degree = degree;
+  m_neiInvDegSum = neiInvDegSum;
+
   Simulator::Schedule (Seconds (0.0), &MyGymEnv2::ScheduleNextStateRead, this);
 }
 
@@ -133,7 +139,7 @@ MyGymEnv2::ScheduleNextStateRead ()
 
   StepState ();
 
-  Simulator::Schedule (m_interval, &MyGymEnv2::ScheduleNextStateRead, this);
+  Simulator::Schedule (m_stepTime, &MyGymEnv2::ScheduleNextStateRead, this);
 }
 
 void
@@ -312,7 +318,7 @@ MyGymEnv2::GetReward ()
   NS_LOG_FUNCTION (this);
 
   const double queue_reward_scale = 1e2;
-  const double utility_reward_scale = 10;
+  const double utility_reward_scale = 30;
   const double reward_scale = 1e3;
   const double epsilon = 5e-5;
   const double lower_bound = 0.1;
@@ -336,28 +342,33 @@ MyGymEnv2::GetReward ()
     }
   utility_reward = std::max (utility_reward, utility_reward_min);
 
-  // individual reward; MYTODO generalize
-  {
-    // graph relationship
-    m_agent_state[0]->m_currentReward = m_agent_state[0]->m_tempReward + 0.5 * m_agent_state[1]->m_tempReward;
-    m_agent_state[1]->m_currentReward = m_agent_state[0]->m_tempReward + m_agent_state[1]->m_tempReward + m_agent_state[2]->m_tempReward;
-    m_agent_state[2]->m_currentReward = 0.5 * m_agent_state[1]->m_tempReward + m_agent_state[2]->m_tempReward;
+  // individual reward (from graph)
+  for (uint32_t i = 0; i < numAgents; i++)
+    {
+      m_agent_state[i]->m_currentReward = m_agent_state[i]->m_tempReward;
+      for (auto it = m_neighbors[i].begin (); it != m_neighbors[i].end (); it++) {
+        m_agent_state[i]->m_currentReward += m_agent_state[*it]->m_tempReward / m_degree[*it];
+      }
+      m_agent_state[i]->m_currentReward /= 1 + m_neiInvDegSum[i];
+      m_agent_state[i]->m_currentReward = std::max (m_agent_state[i]->m_currentReward, utility_reward_min);
+      m_agent_state[i]->m_currentReward *= utility_reward_scale / reward_scale;
+      m_reward_indiv_sum += m_agent_state[i]->m_currentReward;
+    }
 
-    m_agent_state[0]->m_currentReward = std::max (m_agent_state[0]->m_currentReward, utility_reward_min);
-    m_agent_state[1]->m_currentReward = std::max (m_agent_state[1]->m_currentReward, utility_reward_min);
-    m_agent_state[2]->m_currentReward = std::max (m_agent_state[2]->m_currentReward, utility_reward_min);
+  // print individual reward coefficients
+  // for (uint32_t i = 0; i < numAgents; i++)
+  //   {
+  //     std::cout << "R_" << i << " = (";
+  //     for (auto it = m_neighbors[i].begin (); it != m_neighbors[i].end (); it++) {
+  //       std::cout << "r_" << *it << " / " << m_degree[*it] << " + ";
+  //     }
+  //     std::cout << "r_" << i << ") ";
+  //     std::cout << "/ " << (1 + m_neiInvDegSum[i]) << std::endl;
+  //   }
+  // exit(0);
 
-    m_agent_state[0]->m_currentReward *= utility_reward_scale / reward_scale;
-    m_agent_state[1]->m_currentReward *= utility_reward_scale / reward_scale;
-    m_agent_state[2]->m_currentReward *= utility_reward_scale / reward_scale;
-
-    m_reward_indiv_sum += m_agent_state[0]->m_currentReward;
-    m_reward_indiv_sum += m_agent_state[1]->m_currentReward;
-    m_reward_indiv_sum += m_agent_state[2]->m_currentReward;
-  }
-
-  m_queue_reward = queue_reward / queue_reward_scale;
-  m_utility_reward = utility_reward * utility_reward_scale;
+  m_queue_reward = queue_reward / queue_reward_scale / reward_scale;
+  m_utility_reward = utility_reward * utility_reward_scale / reward_scale;
 
   // if (m_useShortReward)
   //   reward = m_utility_reward;  // short_term_utility
@@ -365,7 +376,6 @@ MyGymEnv2::GetReward ()
   //   reward = m_queue_reward;
   reward = m_utility_reward;
 
-  reward /= reward_scale;
   NS_LOG_DEBUG ("MyGetReward: " << reward);
 
   m_reward_sum += reward;

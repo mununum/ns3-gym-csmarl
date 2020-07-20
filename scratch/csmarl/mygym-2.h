@@ -15,7 +15,10 @@ public:
   enum Algorithm { IEEE80211, O_DCF, RL };
 
   MyGymEnv2 (); // for typeid registration
-  MyGymEnv2 (NodeContainer agents, Time simTime, Time stepTime, std::string algorithm,
+  MyGymEnv2 (NodeContainer agents, Time stepTime, std::string algorithm,
+             std::map<uint32_t, std::set<uint32_t>> neighbors,
+             std::map<uint32_t, uint32_t> degree,
+             std::map<uint32_t, double> neiInvDegSum,
              bool debug);
 
   virtual ~MyGymEnv2 ();
@@ -48,8 +51,7 @@ private:
   std::vector<Ptr<MyGymNodeState>> m_agent_state;
 
   std::vector<uint32_t> m_obs_shape;
-  Time m_interval = Seconds (0.005);
-  Time m_simTime;
+  Time m_stepTime = Seconds (0.005);
 
   Algorithm m_algorithm;
   bool m_debug;
@@ -61,6 +63,12 @@ private:
   float m_utility_reward;
 
   uint32_t m_perAgentObsDim;
+
+  // for graphical reward calculation
+  std::map<uint32_t, std::set<uint32_t>> m_neighbors;
+  std::map<uint32_t, uint32_t> m_degree;
+  std::map<uint32_t, double> m_neiInvDegSum;
+
 };
 
 } // namespace ns3

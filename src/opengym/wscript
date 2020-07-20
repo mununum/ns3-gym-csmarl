@@ -18,7 +18,8 @@ def configure(conf):
     conf.env['ENABLE_PROTOC'] = False
 
     protoc_min_version = (3,0,0)
-    protoc = conf.find_program('protoc', var='PROTOC')
+    # protoc = conf.find_program('protoc', var='PROTOC')
+    protoc = ['/usr/bin/protoc']
 
     try:
         cmd= [protoc[0], '--version']

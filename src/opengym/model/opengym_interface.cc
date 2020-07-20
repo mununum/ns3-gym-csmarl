@@ -187,8 +187,8 @@ OpenGymInterface::Init()
   }
 
   // send init msg to python
-  zmq::message_t request(simInitMsg.ByteSize());;
-  simInitMsg.SerializeToArray(request.data(), simInitMsg.ByteSize());
+  zmq::message_t request(simInitMsg.ByteSizeLong());;
+  simInitMsg.SerializeToArray(request.data(), simInitMsg.ByteSizeLong());
   m_zmq_socket.send (request);
 
   // receive init ack msg form python
@@ -256,8 +256,8 @@ OpenGymInterface::NotifyCurrentState()
   envStateMsg.set_info(extraInfo);
 
   // send env state msg to python
-  zmq::message_t request(envStateMsg.ByteSize());;
-  envStateMsg.SerializeToArray(request.data(), envStateMsg.ByteSize());
+  zmq::message_t request(envStateMsg.ByteSizeLong());;
+  envStateMsg.SerializeToArray(request.data(), envStateMsg.ByteSizeLong());
   m_zmq_socket.send (request);
 
   // receive act msg form python

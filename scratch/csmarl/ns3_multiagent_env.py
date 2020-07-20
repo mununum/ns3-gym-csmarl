@@ -8,16 +8,16 @@ from ray import tune
 from ray.tune.registry import register_env
 from ray.rllib.env.multi_agent_env import MultiAgentEnv
 from ns3gym import ns3env
-from graph import read_graph
+from link_graph import read_graph
 
 
 class Ns3MultiAgentEnv(MultiAgentEnv):
 
     def __init__(self, env_config):
         self.worker_index = env_config.worker_index
-        topology = env_config.get("topology", "fim")
-        _, flows = read_graph(topology)
-        self.n_agents = len(flows)
+        self.topology = env_config.get("topology", "fim")
+        _, self.n_agents = read_graph(self.topology)
+        # self.n_agents = len(flows)
         port = 0
         stepTime = env_config.get("stepTime", 0.005)
         seed = env_config.get("seed", 0)
@@ -38,7 +38,7 @@ class Ns3MultiAgentEnv(MultiAgentEnv):
 
         simArgs = {"--simTime": simTime,
                    "--stepTime": stepTime,
-                   "--topology": topology,
+                   "--topology": self.topology,
                    "--traffic": traffic,
                    "--intensity": intensity,
                    "--algorithm": "rl",
@@ -72,11 +72,8 @@ class Ns3MultiAgentEnv(MultiAgentEnv):
                 index = int(k.split('_')[1])
                 reward[index] = float(v)
         return reward
-        # return {int(kv.split('=')[0]): float(kv.split('=')[1])
-        #         for kv in info.split()}
 
     def parse_info(self, info, obs, state):
-
         common_info = {"state": np.array(state)}  # for centralized critic
         for kv in info.split():
             k, v = kv.split('=')
@@ -105,7 +102,8 @@ class Ns3MultiAgentEnv(MultiAgentEnv):
         return ret
 
     def reset(self):
-        print("worker {} reset".format(self.worker_index)) if self.debug else None
+        # print("worker {} reset".format(self.worker_index)) if self.debug else None
+        print("worker {} reset".format(self.worker_index))
         obs = self._env.reset()
         return self.obs_to_dict(obs)
 
@@ -124,11 +122,14 @@ class Ns3MultiAgentEnv(MultiAgentEnv):
         return obs, rew, done, info
 
     def close(self):
-        print("worker {} close".format(self.worker_index)) if self.debug else None
+        # print("worker {} close".format(self.worker_index)) if self.debug else None
+        print("worker {} close".format(self.worker_index))
         self._env.close()
 
 
 def on_episode_start(info):
+    print("on_episode_start called in worker {}".format(info["env"].envs[0].worker_index))
+    print(info["policy"])
     episode = info["episode"]
     episode.user_data = defaultdict(list)  # clear user data
 
@@ -152,13 +153,11 @@ def on_episode_step(info):
 def on_episode_end(info):
     episode = info["episode"]
     for k, v in episode.user_data.items():
-        if "tx_rate" in k:
-            agg = np.sum(v)
-        elif k.startswith("reward"):
-            agg = np.sum(v)
-        else:
+        if "loss_rate" in k:
             # MYTODO np.mean is not technically correct at this point
             agg = np.mean(v)
+        else:
+            agg = np.sum(v)
         episode.custom_metrics[k] = agg
 
 

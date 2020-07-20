@@ -8,14 +8,14 @@ import ray
 from ray import tune
 from ray.rllib.models import ModelCatalog
 from ray.rllib.models.modelv2 import ModelV2
-from ray.rllib.models.tf.recurrent_tf_modelv2 import RecurrentTFModelV2
+from ray.rllib.models.tf.recurrent_tf_model_v2 import RecurrentTFModelV2
 from ray.rllib.utils.tf_ops import make_tf_callable
 from ray.rllib.utils.annotations import override
 from ray.rllib.utils import try_import_tf
 
 from ns3_multiagent_env import Ns3MultiAgentEnv, on_episode_start, on_episode_step, on_episode_end
 from ns3_centralized_critic import CCTrainer
-from graph import read_graph
+from link_graph import read_graph
 
 tf = try_import_tf()
 
@@ -34,8 +34,8 @@ class CentralizedCriticRNNModel(RecurrentTFModelV2):
                                                         model_config, name)
         self.cell_size = cell_size
 
-        _, flows = read_graph(model_config["custom_options"]["topology"])
-        self.n_agents_in_critic = len(flows)
+        _, self.n_agents_in_critic = read_graph(model_config["custom_options"]["topology"])
+        # self.n_agents_in_critic = len(flows)
         self.obs_dim = obs_space.shape[0]
         self.act_dim = self.num_outputs
         # MYTODO make proper mapping on agent_id
@@ -163,7 +163,7 @@ if __name__ == "__main__":
 
     # MYTODO: make it configurable
     cwd = os.path.dirname(os.path.abspath(__file__))
-    topology = "fim"
+    topology = "complex"
 
     config_params = [0]
     env_config = {  # environment configuration

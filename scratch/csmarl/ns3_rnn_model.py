@@ -8,7 +8,7 @@ import ray
 from ray import tune
 from ray.rllib.models import ModelCatalog
 from ray.rllib.models.modelv2 import ModelV2
-from ray.rllib.models.tf.recurrent_tf_modelv2 import RecurrentTFModelV2
+from ray.rllib.models.tf.recurrent_tf_model_v2 import RecurrentTFModelV2
 from ray.rllib.utils.annotations import override
 from ray.rllib.utils import try_import_tf
 
@@ -97,9 +97,11 @@ if __name__ == "__main__":
     parser.add_argument(
         "--debug", help="debug indicator, default false", type=bool, default=False)
     parser.add_argument(
-        "--topology", help="topology to train, default complex", type=str, default="fim")
+        "--topology", help="topology to train, default complex", type=str, default="complex")
     parser.add_argument(
         "--delayRewardWeight", help="weight of delay reward, default 0.0", type=float, default=0.0)
+    parser.add_argument(
+        "--sharedReward", help="shared reward", dest="sharedReward", action="store_true", default=False)
 
     args = parser.parse_args()
 
@@ -108,13 +110,13 @@ if __name__ == "__main__":
     cwd = os.path.dirname(os.path.abspath(__file__))
 
     NUM_GPUS = 4
-    num_workers = 16
+    num_workers = 8
 
     if args.debug:
         params_list = [0]
     else:
         params_list = [0]
-        # params_list = [5e-4, 5e-5]  # for parameter testing
+        # params_list = [5e-3, 5e-4, 5e-5, 5e-6]  # for parameter testing
 
     num_samples = 1
     
@@ -133,15 +135,16 @@ if __name__ == "__main__":
             "env_config": {
                 "cwd": cwd,
                 "debug": args.debug,
-                "reward": "indiv",
+                "reward": "shared" if args.sharedReward else "indiv",
                 "topology": args.topology,
                 "delayRewardWeight": args.delayRewardWeight,
                 "traffic": "cbr",
-                "randomFlow": True if args.topology == "complex" else False,
+                "randomFlow": False,
                 "randomIntensity": False,
             },
             "num_workers": 0 if args.debug else num_workers,
             "num_gpus_per_worker": num_gpus_per_worker,
+            "gamma": 0.5,
             # "lr": tune.grid_search(params_list),
             "lr": 5e-4,
             # "lr": 5e-4 if args.debug else tune.grid_search(params_list),

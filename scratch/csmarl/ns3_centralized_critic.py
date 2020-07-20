@@ -7,11 +7,11 @@ from ray import tune
 from ray.tune.registry import register_env
 
 from ray.rllib.agents.ppo.ppo import PPOTrainer
-from ray.rllib.agents.ppo.ppo_policy import PPOTFPolicy, KLCoeffMixin, PPOLoss, BEHAVIOUR_LOGITS
+from ray.rllib.agents.ppo.ppo_tf_policy import PPOTFPolicy, KLCoeffMixin, PPOLoss
 from ray.rllib.evaluation.postprocessing import compute_advantages, Postprocessing
 from ray.rllib.models import ModelCatalog
 from ray.rllib.policy.sample_batch import SampleBatch
-from ray.rllib.policy.tf_policy import LearningRateSchedule, EntropyCoeffSchedule, ACTION_LOGP
+from ray.rllib.policy.tf_policy import LearningRateSchedule, EntropyCoeffSchedule
 from ray.rllib.models.tf.tf_modelv2 import TFModelV2
 from ray.rllib.models.tf.fcnet_v2 import FullyConnectedNetwork
 from ray.rllib.utils.explained_variance import explained_variance
@@ -19,7 +19,7 @@ from ray.rllib.utils.tf_ops import make_tf_callable
 from ray.rllib.utils import try_import_tf
 
 from ns3_multiagent_env import Ns3MultiAgentEnv, on_episode_start, on_episode_step, on_episode_end
-from graph import read_graph
+from link_graph import read_graph
 
 tf = try_import_tf()
 
@@ -47,8 +47,8 @@ class CentralizedCriticModel(TFModelV2):
             obs_space, action_space, num_outputs, model_config, name)
         self.register_variables(self.model.variables())
 
-        _, flows = read_graph(model_config["custom_options"]["topology"])
-        self.n_agents_in_critic = len(flows)
+        _, self.n_agents_in_critic = read_graph(model_config["custom_options"]["topology"])
+        # self.n_agents_in_critic = len(flows)
 
         # Value network
         # Central VF maps (obs, other_obs, other_act, agent_id) -> vf_pred
@@ -245,8 +245,8 @@ def loss_with_central_critic(policy, model, dist_class, train_batch):
         train_batch[Postprocessing.VALUE_TARGETS],
         train_batch[Postprocessing.ADVANTAGES],
         train_batch[SampleBatch.ACTIONS],
-        train_batch[BEHAVIOUR_LOGITS],
-        train_batch[ACTION_LOGP],
+        train_batch[SampleBatch.ACTION_DIST_INPUTS],
+        train_batch[SampleBatch.ACTION_LOGP],
         train_batch[SampleBatch.VF_PREDS],
         action_dist,
         policy.central_value_out,
@@ -256,8 +256,7 @@ def loss_with_central_critic(policy, model, dist_class, train_batch):
         clip_param=policy.config["clip_param"],
         vf_clip_param=policy.config["vf_clip_param"],
         vf_loss_coeff=policy.config["vf_loss_coeff"],
-        use_gae=policy.config["use_gae"],
-        model_config=policy.config["model"])
+        use_gae=policy.config["use_gae"])
 
     return policy.loss_obj.loss
 
@@ -291,7 +290,14 @@ CCPPO = PPOTFPolicy.with_updates(
     ]
 )
 
-CCTrainer = PPOTrainer.with_updates(name="CCPPOTrainer", default_policy=CCPPO)
+def get_policy_class(config):
+    return CCPPO
+
+CCTrainer = PPOTrainer.with_updates(
+    name="CCPPOTrainer", 
+    default_policy=CCPPO,
+    get_policy_class=get_policy_class,
+)
 
 if __name__ == "__main__":
 
@@ -321,7 +327,7 @@ if __name__ == "__main__":
             "log_level": "DEBUG" if args.debug else "WARN",
             "env_config": {
                 "cwd": cwd,
-                "debug": args.debug,
+                "debug": False, #args.debug,
                 "reward": "shared",
                 "topology": topology,
                 "traffic": "cbr",

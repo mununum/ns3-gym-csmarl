@@ -99,15 +99,12 @@ class GraphConvolutionalCriticRNNModel(RecurrentNetwork):
             shape=(self.obs_dim,), name="obs")
 
         # used for graph convolution
-        # [batch_size, \sum (degree of nodes)]
         neighbor_num = tf.keras.layers.Input(
             shape=(1,), name="neighbor_num")
         neighbor_obs = tf.keras.layers.Input(
             shape=(self.n_agents, self.obs_dim,), name="neighbor_obs")
         neighbor_act = tf.keras.layers.Input(
             shape=(self.n_agents, self.act_dim,), name="neighbor_act")
-        # segment_ids = tf.keras.layers.Input(
-        #     shape=(), name="segment_ids", dtype=tf.int32)
 
         obs_dense = tf.keras.layers.Dense(
             hiddens_size, activation=tf.nn.tanh, name="obs_dense")(obs)
@@ -118,11 +115,9 @@ class GraphConvolutionalCriticRNNModel(RecurrentNetwork):
             hiddens_size, activation=tf.nn.tanh, use_bias=False, name="neighbor_dense")(neighbor_feat)
 
         neighbor_sum = tf.math.reduce_sum(neighbor_dense, axis=-2, name="neighbor_sum")
-        # neighbor_mean = tf.math.segment_mean(neighbor_dense, segment_ids, name="neighbor_mean")
 
         # conditional expression considering island nodes
         gnn_vf_in = tf.cond(neighbor_num[0][0] > 0, lambda: obs_dense + neighbor_sum / neighbor_num, lambda: obs_dense, name="gnn_vf_in")
-        # gnn_vf_in = tf.cond(neighbor_exists[0], lambda: obs_dense + neighbor_mean, lambda: obs_dense, name="gnn_vf_in")
         gnn_vf_dense = tf.keras.layers.Dense(
             hiddens_size, activation=tf.nn.tanh, name="gnn_vf_dense")(gnn_vf_in)
         gnn_vf_out = tf.keras.layers.Dense(

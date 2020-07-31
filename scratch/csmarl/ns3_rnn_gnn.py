@@ -66,7 +66,7 @@ class GraphConvolutionalCriticRNNModel(RecurrentNetwork):
         state_in_c = tf.keras.layers.Input(shape=(cell_size,), name="c")
         seq_in = tf.keras.layers.Input(shape=(), name="seq_in", dtype=tf.int32)
 
-        # Preprocess observation with a hidden layer and cend to LSTM cell
+        # Preprocess observation with a hidden layer and send to LSTM cell
         dense1 = tf.keras.layers.Dense(
             hiddens_size, activation=tf.nn.relu, name="dense1")(input_layer)
         lstm_out, state_h, state_c = tf.keras.layers.LSTM(
@@ -177,7 +177,7 @@ def graph_convolutional_critic_postprocessing(policy, sample_batch, other_agent_
 
         obs_dim = sample_batch[SampleBatch.CUR_OBS].shape[-1]
 
-        sample_batch[NEIGHBOR_OBS] = np.zeros((1, n_agents, obs_dim))
+        sample_batch[NEIGHBOR_OBS] = np.zeros((1, n_agents, obs_dim), dtype=np.float32)
         sample_batch[NEIGHBOR_ACT] = np.zeros((1, n_agents), dtype=np.int32)
 
         sample_batch[SampleBatch.VF_PREDS] = np.zeros_like(sample_batch[SampleBatch.ACTIONS], dtype=np.float32)
@@ -207,7 +207,7 @@ def graph_convolutional_critic_postprocessing(policy, sample_batch, other_agent_
 
         sample_batch[NEIGHBOR_NUM] = np.ones((batch_size, 1), dtype=np.float32) * len(G[agent_id])
 
-        sample_batch[NEIGHBOR_OBS] = np.zeros(((batch_size, n_agents, obs_dim)))
+        sample_batch[NEIGHBOR_OBS] = np.zeros(((batch_size, n_agents, obs_dim)), dtype=np.float32)
         sample_batch[NEIGHBOR_ACT] = np.zeros(((batch_size, n_agents)), dtype=np.int32)
 
         for i, n in enumerate(G[agent_id]):
@@ -364,10 +364,10 @@ if __name__ == "__main__":
     topology = "complex"
 
     NUM_GPUS = 4
-    num_workers = 8
+    num_workers = 16
 
-    params_list = [0]
-    # params_list = [5e-3, 5e-4, 5e-5, 5e-6]
+    # params_list = [0]
+    params_list = [5e-3, 5e-4, 5e-5, 5e-6]
 
     num_samples = 1
 
@@ -405,7 +405,7 @@ if __name__ == "__main__":
             },
             "callbacks": MyCallbacks,
         },
-        num_samples=1,
+        num_samples=num_samples,
         checkpoint_freq=10,
         keep_checkpoints_num=1,
         checkpoint_score_attr="episode_reward_mean",

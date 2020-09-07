@@ -37,7 +37,8 @@ class CentralizedCriticModel(TFModelV2):
                  action_space,  # Discrete(10)
                  num_outputs,  # 10
                  model_config,
-                 name):
+                 name,
+                 topology="fim"):
         super(CentralizedCriticModel, self).__init__(
             obs_space, action_space, num_outputs, model_config, name)
 
@@ -47,7 +48,7 @@ class CentralizedCriticModel(TFModelV2):
             obs_space, action_space, num_outputs, model_config, name)
         self.register_variables(self.model.variables())
 
-        _, self.n_agents_in_critic = read_graph(model_config["custom_options"]["topology"])
+        _, self.n_agents_in_critic = read_graph(topology)
         # self.n_agents_in_critic = len(flows)
 
         # Value network
@@ -239,7 +240,6 @@ def loss_with_central_critic(policy, model, dist_class, train_batch):
 
     # VALUE_TARGETS = VF_PREDS + ADVANTAGES
     policy.loss_obj = PPOLoss(
-        policy.action_space,
         dist_class,
         model,
         train_batch[Postprocessing.VALUE_TARGETS],

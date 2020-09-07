@@ -43,6 +43,8 @@ public:
         m_e2eDelaySum (Seconds (0.0)),
         m_e2eDelayEwma (0.0),
         m_HOLDelayEwma (0.0),
+        m_totalCCADuration (Seconds (0.0)),
+        m_busyCCADuration (Seconds (0.0)),
         m_delay_estimator (CreateObject<DelayJitterEstimation> ()),
         m_delay_estimator_2 (CreateObject<DelayJitterEstimation2> (1))
   {
@@ -56,6 +58,9 @@ public:
 
     m_tempReward = 0.0;
     m_currentReward = 0.0;
+
+    m_totalCCADuration = Seconds (0.0);
+    m_busyCCADuration = Seconds (0.0);
   }
 
 private:
@@ -72,6 +77,9 @@ private:
   Time m_e2eDelaySum;
   double m_e2eDelayEwma;
   double m_HOLDelayEwma;
+
+  Time m_totalCCADuration;
+  Time m_busyCCADuration;
 
   Ptr<DelayJitterEstimation> m_delay_estimator;  // for HOL delay
   Ptr<DelayJitterEstimation2> m_delay_estimator_2; // for MAQ delay
@@ -112,7 +120,7 @@ MyGymEnv2::MyGymEnv2 (NodeContainer agents, Time stepTime, std::string algorithm
       m_agent_state.push_back (CreateObject<MyGymNodeState> ());
     }
 
-  m_perAgentObsDim = 5; // Throughput, QueueLength, e2e Latency, Loss%, CW
+  m_perAgentObsDim = 6; // Throughput, QueueLength, e2e Latency, Loss%, BusyCCAFrac, CW
 
   m_neighbors = neighbors;
   m_degree = degree;
@@ -284,6 +292,13 @@ MyGymEnv2::GetObservation ()
       double lat = m_agent_state[i]->m_HOLDelayEwma;
       lat /= 1e9; // latency unit: sec
 
+      // busy cca duration
+      double busy_cca_fraction;
+      if (m_agent_state[i]->m_totalCCADuration == Seconds (0.0))
+        busy_cca_fraction = 0.0;
+      else
+        busy_cca_fraction = m_agent_state[i]->m_busyCCADuration.GetDouble () / m_agent_state[i]->m_totalCCADuration.GetDouble ();
+
       // Loss%
       Ptr<NetDevice> dev = node->GetDevice (0);
       Ptr<WifiNetDevice> wifi_dev = DynamicCast<WifiNetDevice> (dev);
@@ -299,10 +314,12 @@ MyGymEnv2::GetObservation ()
       box->AddValue (avg_thpt);
       box->AddValue (lat);
       box->AddValue (err_rate);
+      box->AddValue (busy_cca_fraction);
       box->AddValue (mincw);
 
       if (m_debug)
         std::cout << qlen << "\t";
+        // std::cout << busy_cca_fraction << "\t";
         // std::cout << thpt << "\t" << qlen << "\t" << lat << "\t" << err_rate << "\t" << mincw << std::endl;
     }
 
@@ -346,10 +363,10 @@ MyGymEnv2::GetReward ()
   for (uint32_t i = 0; i < numAgents; i++)
     {
       m_agent_state[i]->m_currentReward = m_agent_state[i]->m_tempReward;
-      for (auto it = m_neighbors[i].begin (); it != m_neighbors[i].end (); it++) {
-        m_agent_state[i]->m_currentReward += m_agent_state[*it]->m_tempReward / m_degree[*it];
-      }
-      m_agent_state[i]->m_currentReward /= 1 + m_neiInvDegSum[i];
+      // for (auto it = m_neighbors[i].begin (); it != m_neighbors[i].end (); it++) {
+      //   m_agent_state[i]->m_currentReward += m_agent_state[*it]->m_tempReward / m_degree[*it];
+      // }
+      // m_agent_state[i]->m_currentReward /= 1 + m_neiInvDegSum[i];
       m_agent_state[i]->m_currentReward = std::max (m_agent_state[i]->m_currentReward, utility_reward_min);
       m_agent_state[i]->m_currentReward *= utility_reward_scale / reward_scale;
       m_reward_indiv_sum += m_agent_state[i]->m_currentReward;
@@ -506,6 +523,16 @@ MyGymEnv2::SrcTxDone (Ptr<MyGymEnv2> entity, Ptr<Node> node, uint32_t idx, const
       // e2e delay statistic for performance measurement
       state->m_e2eDelaySum += e2eDelay;
     }
+}
+
+void
+MyGymEnv2::PhyStateChange (Ptr<MyGymEnv2> entity, uint32_t idx, Time start, Time duration, WifiPhyState state)
+{
+  Ptr<MyGymNodeState> gym_state = entity->m_agent_state[idx];
+
+  if (state == WifiPhyState::RX || state == WifiPhyState::CCA_BUSY)
+    gym_state->m_busyCCADuration += duration;
+  gym_state->m_totalCCADuration += duration;
 }
 
 void

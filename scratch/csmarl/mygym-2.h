@@ -38,6 +38,8 @@ public:
 
   static void SrcTxDone (Ptr<MyGymEnv2> entity, Ptr<Node> node, uint32_t idx,
                          const WifiMacHeader &hdr);
+  static void PhyStateChange (Ptr<MyGymEnv2> entity, uint32_t idx, Time start, Time duration, 
+                              WifiPhyState state);
 
 private:
   void ScheduleNextStateRead ();

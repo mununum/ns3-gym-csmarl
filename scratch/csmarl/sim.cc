@@ -140,6 +140,7 @@ main (int argc, char *argv[])
       // LogComponentEnable ("OpenGymInterface", LOG_LEVEL_DEBUG);
       // LogComponentEnable ("ODcfQueue", LOG_LOGIC);
       // LogComponentEnable ("Queue", LOG_LEVEL_INFO);
+      // LogComponentEnable ("MacLow", LOG_LEVEL_DEBUG);
     }
 
   if (noErrors)
@@ -414,6 +415,13 @@ main (int argc, char *argv[])
         Ptr<RegularWifiMac> rmac = DynamicCast<RegularWifiMac> (wifi_mac);
         rmac->TraceConnectWithoutContext (
             "TxOkHeader", MakeBoundCallback (&MyGymEnv2::SrcTxDone, myGymEnv2, node, i));
+
+        Ptr<WifiPhy> phy = rmac->GetWifiPhy ();
+        PointerValue ptr;
+        phy->GetAttribute ("State", ptr);
+        Ptr<WifiPhyStateHelper> phy_state = ptr.Get<WifiPhyStateHelper> ();
+        phy_state->TraceConnectWithoutContext (
+          "State", MakeBoundCallback (&MyGymEnv2::PhyStateChange, myGymEnv2, i));
       }
 
   } else {

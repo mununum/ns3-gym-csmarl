@@ -13,17 +13,22 @@ from ray.rllib.models.modelv2 import ModelV2
 from ray.rllib.models.tf.recurrent_net import RecurrentNetwork
 from ray.rllib.policy.sample_batch import SampleBatch
 from ray.rllib.policy.tf_policy import LearningRateSchedule, EntropyCoeffSchedule
+from ray.rllib.utils import merge_dicts
 from ray.rllib.utils.annotations import override
 from ray.rllib.utils.explained_variance import explained_variance
 from ray.rllib.utils.framework import try_import_tf
 from ray.rllib.utils.tf_ops import make_tf_callable
 
 from ns3_import import import_graph_module
-from ns3_multiagent_env import MyCallbacks
+from ns3_multiagent_env import MyCallbacks, ns3_execution_plan
 
 graph = import_graph_module()
 
 tf = try_import_tf()
+
+ALL_OBS = "all_obs"
+ALL_ACT = "all_act"
+ADJ = "adj"
 
 
 class GraphConvLayer(tf.keras.layers.Layer):
@@ -89,7 +94,7 @@ class Ns3GNNModel(RecurrentNetwork):
         self.register_variables(self.rnn_model.variables)
 
         # value network
-        self.gnn_vf = self._value_network(64)
+        self.gnn_vf = self._value_network(32)
         self.register_variables(self.gnn_vf.variables)
 
     def _policy_network(self, hiddens_size, cell_size):
@@ -208,10 +213,10 @@ def gnn_critic_postprocessing(policy, sample_batch, other_agent_batches=None, ep
 
     if not policy.loss_initialized():
 
-        sample_batch["all_obs"] = np.zeros(
+        sample_batch[ALL_OBS] = np.zeros(
             (1, n_agents, obs_dim), dtype=np.float32)
-        sample_batch["all_act"] = np.zeros((1, n_agents), dtype=np.int32)
-        sample_batch["adj"] = np.zeros((1, n_agents, n_agents), dtype=np.float32)
+        sample_batch[ALL_ACT] = np.zeros((1, n_agents), dtype=np.int32)
+        sample_batch[ADJ] = np.zeros((1, n_agents, n_agents), dtype=np.float32)
 
         sample_batch[SampleBatch.VF_PREDS] = np.zeros_like(
             sample_batch[SampleBatch.REWARDS], dtype=np.float32)
@@ -235,15 +240,15 @@ def gnn_critic_postprocessing(policy, sample_batch, other_agent_batches=None, ep
 
         batch_size = sample_batch[SampleBatch.CUR_OBS].shape[0]
 
-        sample_batch["all_obs"] = np.zeros(
+        sample_batch[ALL_OBS] = np.zeros(
             (batch_size, n_agents, obs_dim), dtype=np.float32)
-        sample_batch["all_act"] = np.zeros(
+        sample_batch[ALL_ACT] = np.zeros(
             (batch_size, n_agents), dtype=np.int32)
 
-        sample_batch["all_obs"][:, 0, :] = sample_batch[SampleBatch.CUR_OBS]
+        sample_batch[ALL_OBS][:, 0, :] = sample_batch[SampleBatch.CUR_OBS]
         for i, other_id in enumerate(other_batches):
-            sample_batch["all_obs"][:, i+1, :] = other_batches[other_id][SampleBatch.CUR_OBS]
-            sample_batch["all_act"][:, i+1] = other_batches[other_id][SampleBatch.ACTIONS]
+            sample_batch[ALL_OBS][:, i+1, :] = other_batches[other_id][SampleBatch.CUR_OBS]
+            sample_batch[ALL_ACT][:, i+1] = other_batches[other_id][SampleBatch.ACTIONS]
 
         # adjacency matrix
         adj = nx.adjacency_matrix(G, nodelist=[agent_id]+list(other_batches)).todense()
@@ -256,10 +261,10 @@ def gnn_critic_postprocessing(policy, sample_batch, other_agent_batches=None, ep
         d_tilde_inv_sqrt = np.diag(d_tilde_inv_sqrt_diag)
         adj_norm = np.dot(np.dot(d_tilde_inv_sqrt, adj_tilde), d_tilde_inv_sqrt)
 
-        sample_batch["adj"] = np.array([adj_norm] * batch_size)
+        sample_batch[ADJ] = np.array([adj_norm] * batch_size)
 
         sample_batch[SampleBatch.VF_PREDS] = policy.compute_gnn_vf(
-            sample_batch["all_obs"], sample_batch["all_act"], sample_batch["adj"])
+            sample_batch[ALL_OBS], sample_batch[ALL_ACT], sample_batch[ADJ])
 
     train_batch = compute_advantages(
         sample_batch,
@@ -277,7 +282,7 @@ def loss_with_gnn_critic(policy, model, dist_class, train_batch):
     action_dist = dist_class(logits, model)
 
     policy.gnn_value_out = policy.model.gnn_value_function(
-        train_batch["all_obs"], train_batch["all_act"], train_batch["adj"])
+        train_batch[ALL_OBS], train_batch[ALL_ACT], train_batch[ADJ])
     
     mask = tf.ones_like(train_batch[Postprocessing.ADVANTAGES], dtype=tf.bool)
 
@@ -339,6 +344,7 @@ GNNPPOTrainer = PPOTrainer.with_updates(
     name="GNNPPOTrainer",
     default_policy=GNNPPO,
     get_policy_class=get_policy_class,
+    execution_plan=ns3_execution_plan,
 )
 
 ModelCatalog.register_custom_model("gnn_model", Ns3GNNModel)
@@ -355,6 +361,7 @@ if __name__ == "__main__":
 
     env_config = {
         "topology": args.topology,
+        "exp_name": __file__.split(".")[0],
     }
 
     _, n_agents = graph.read_graph(env_config["topology"])
@@ -379,6 +386,22 @@ if __name__ == "__main__":
             }
         }
     }
+
+    if env_config["topology"] == "random":
+        # add evaluation config
+        num_eval_workers = 4
+        num_gpus_per_worker = NUM_GPUS / (num_workers + num_eval_workers)
+        eval_config = {
+            "evaluation_interval": 1,
+            "evaluation_num_workers": num_eval_workers,
+            "evaluation_num_episodes": num_eval_workers,
+            "evaluation_config": {
+                "env_config": {"topology": "complex"},
+                "explore": False,
+            },
+            "num_gpus_per_worker": num_gpus_per_worker,
+        }
+        config = merge_dicts(config, eval_config)
 
     if args.debug:
         env_config["simTime"] = 1

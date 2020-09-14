@@ -1,10 +1,15 @@
 import os
 import gym
-from collections import defaultdict
 import numpy as np
+from collections import defaultdict
+from functools import partial
 
 from ray.rllib.agents.callbacks import DefaultCallbacks
+from ray.rllib.agents.ppo.ppo import UpdateKL, warn_about_bad_reward_scales
 from ray.rllib.env.multi_agent_env import MultiAgentEnv
+from ray.rllib.execution.metric_ops import StandardMetricsReporting
+from ray.rllib.execution.rollout_ops import ParallelRollouts, ConcatBatches, StandardizeFields, SelectExperiences
+from ray.rllib.execution.train_ops import TrainOneStep, TrainTFMultiGPU
 from ray.tune.registry import register_env
 from ns3gym import ns3env
 
@@ -30,9 +35,17 @@ class Ns3MultiAgentEnv(MultiAgentEnv):
         self.debug = env_config.get("debug", False)
 
         # random topology generation
+        self.exp_name = env_config.get("exp_name", "default")
+        if self.topology == "random":
+            # random topology
+            self.topology_file = self.topology + "-" + self.exp_name
+            if env_config.worker_index == 0:
+                graph.gen_graph(self.topology_file)
+        else:
+            self.topology_file = self.topology
 
         simArgs = {
-            "--topology": self.topology,
+            "--topology": self.topology_file,
             "--simTime": simTime,
             "--stepTime": stepTime,
             "--intensity": intensity,
@@ -110,7 +123,7 @@ class MyCallbacks(DefaultCallbacks):
 
     def on_episode_start(self, worker, base_env, policies, episode, **kwargs):
         env = base_env.envs[0]
-        episode.user_data["graph"], _ = graph.read_graph(env.topology)
+        episode.user_data["graph"], _ = graph.read_graph(env.topology_file)
         episode.user_data["stat"] = defaultdict(list)
 
     def on_episode_step(self, worker, base_env, episode, **kwargs):
@@ -124,3 +137,52 @@ class MyCallbacks(DefaultCallbacks):
             episode.custom_metrics[k] = np.sum(v)
 
 register_env("ns3_multiagent_env", lambda env_config: Ns3MultiAgentEnv(env_config))
+
+
+def renew_graph(config, item):
+    # change the topology in a master thread
+    if config["env_config"]["topology"] == "random":
+        exp_name = config["env_config"].get("exp_name", "default")
+        topology_file = config["env_config"]["topology"] + "-" + exp_name
+        graph.gen_graph(topology_file)
+
+    return item
+
+
+def ns3_execution_plan(workers, config):
+    rollouts = ParallelRollouts(workers, mode="bulk_sync")
+
+    # Collect large batches of relevant experiences & standardize.
+    rollouts = rollouts.for_each(
+        SelectExperiences(workers.trainable_policies()))
+    rollouts = rollouts.combine(
+        ConcatBatches(min_batch_size=config["train_batch_size"]))
+    rollouts = rollouts.for_each(StandardizeFields(["advantages"]))
+
+    if config["simple_optimizer"]:
+        train_op = rollouts.for_each(
+            TrainOneStep(
+                workers,
+                num_sgd_iter=config["num_sgd_iter"],
+                sgd_minibatch_size=config["sgd_minibatch_size"]))
+    else:
+        train_op = rollouts.for_each(
+            TrainTFMultiGPU(
+                workers,
+                sgd_minibatch_size=config["sgd_minibatch_size"],
+                num_sgd_iter=config["num_sgd_iter"],
+                num_gpus=config["num_gpus"],
+                rollout_fragment_length=config["rollout_fragment_length"],
+                num_envs_per_worker=config["num_envs_per_worker"],
+                train_batch_size=config["train_batch_size"],
+                shuffle_sequences=config["shuffle_sequences"],
+                _fake_gpus=config["_fake_gpus"]))
+
+    # change the graph topology
+    train_op = train_op.for_each(partial(renew_graph, config))
+
+    # Update KL after each round of training.
+    train_op = train_op.for_each(lambda t: t[1]).for_each(UpdateKL(workers))
+
+    return StandardMetricsReporting(train_op, workers, config) \
+        .for_each(lambda result: warn_about_bad_reward_scales(config, result))

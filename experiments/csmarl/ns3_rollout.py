@@ -210,7 +210,8 @@ if __name__ == "__main__":
         "multiagent": {
             "policies_to_train": ["nothing"]
         },
-        "explore": False
+        "explore": False,
+        "evaluation_interval": None,
     }
 
     # load checkpoint

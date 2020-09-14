@@ -4,14 +4,16 @@ import numpy as np
 import ray
 from ray import tune
 
+from ray.rllib.agents.ppo.ppo import PPOTrainer
 from ray.rllib.models import ModelCatalog
 from ray.rllib.models.modelv2 import ModelV2
 from ray.rllib.models.tf.recurrent_net import RecurrentNetwork
+from ray.rllib.utils import merge_dicts
 from ray.rllib.utils.annotations import override
 from ray.rllib.utils.framework import try_import_tf
 
 from ns3_import import import_graph_module
-from ns3_multiagent_env import MyCallbacks
+from ns3_multiagent_env import MyCallbacks, ns3_execution_plan
 
 graph = import_graph_module()
 
@@ -91,6 +93,10 @@ ModelCatalog.register_custom_model(
     "rnn_model", Ns3RNNModel
 )
 
+Ns3PPOTrainer = PPOTrainer.with_updates(
+    execution_plan=ns3_execution_plan,
+)
+
 
 if __name__ == "__main__":
 
@@ -103,6 +109,7 @@ if __name__ == "__main__":
 
     env_config = {
         "topology": args.topology,
+        "exp_name": __file__.split(".")[0],
     }
 
     _, n_agents = graph.read_graph(env_config["topology"])
@@ -125,8 +132,24 @@ if __name__ == "__main__":
             "custom_model_config": {
                 "n_agents": n_agents,
             }
-        }
+        },
     }
+
+    if env_config["topology"] == "random":
+        # add evaluation config
+        num_eval_workers = 4
+        num_gpus_per_worker = NUM_GPUS / (num_workers + num_eval_workers)
+        eval_config = {
+            "evaluation_interval": 1,
+            "evaluation_num_workers": num_eval_workers,
+            "evaluation_num_episodes": num_eval_workers,
+            "evaluation_config": {
+                "env_config": {"topology": "complex"},
+                "explore": False,
+            },
+            "num_gpus_per_worker": num_gpus_per_worker,
+        }
+        config = merge_dicts(config, eval_config)
 
     if args.debug:
         env_config["simTime"] = 1
@@ -137,4 +160,4 @@ if __name__ == "__main__":
         "training_iteration": 1000,
     }
 
-    tune.run("PPO", config=config, stop=stop, checkpoint_freq=10, keep_checkpoints_num=1)
+    tune.run(Ns3PPOTrainer, config=config, stop=stop, checkpoint_freq=10, keep_checkpoints_num=1)

@@ -77,7 +77,8 @@ ODcf::ODcf (Ptr<ODcfAdhocWifiMac> mac, Ptr<ODcfTxop> txop, uint32_t minCw, uint3
       m_currentTransmissionIntensity (0),
       m_currentHoldingDurationInSlot (0),
       m_isHolding (false),
-      m_minCw (minCw)
+      m_minCw (minCw),
+      m_sourceInterval (Seconds (0.0))
 {
   NS_LOG_FUNCTION (this << mac << txop << maxCw);
 
@@ -156,6 +157,14 @@ ODcf::GetMAQLength ()
     return 0;
 
   return m_currentQueue->GetMediaAccessQueueSize ();
+}
+
+void
+ODcf::SetSourceInterval (Time interval)
+{
+  NS_ASSERT (m_RLmode);
+
+  m_sourceInterval = interval;
 }
 
 uint32_t
@@ -508,7 +517,14 @@ ODcf::GetSourceInterval (uint32_t mediaAccessQueueSize) const
 {
   NS_ASSERT (m_V > 0);
 
-  return Seconds (GetTransmissionAggressiveness (mediaAccessQueueSize) / m_V);
+  Time ret;
+
+  if (m_RLmode && m_sourceInterval > Seconds (0.0))
+    ret = m_sourceInterval;
+  else
+    ret = Seconds (GetTransmissionAggressiveness (mediaAccessQueueSize) / m_V);
+
+  return ret;
 }
 
 ODcf::Mode

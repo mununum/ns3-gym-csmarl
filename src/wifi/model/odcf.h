@@ -52,6 +52,8 @@ public:
   uint32_t GetCw ();
   uint32_t GetMAQLength ();
 
+  void SetSourceInterval (Time interval);  // called by RL agent
+
 private:
   Ptr<ODcfQueue> Find (const Mac48Address& to) const;
   Ptr<ODcfQueue> LinkSchedule ();
@@ -92,6 +94,7 @@ private:
 
   bool m_RLmode;
   uint32_t m_minCw;  // only used in RL mode
+  Time m_sourceInterval;  // only used in RL mode
 
   Variant m_variant;
 };

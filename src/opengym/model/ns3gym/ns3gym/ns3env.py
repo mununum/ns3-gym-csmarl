@@ -338,7 +338,7 @@ class Ns3ZmqBridge(object):
             dataContainer.type = pb.Tuple
             tupleDataPb = pb.TupleDataContainer()
 
-            spaceList = list(self._action_space.spaces)
+            spaceList = list(spaceDesc.spaces)
             subDataList = []
             for subAction, subActSpaceType in zip(actions, spaceList):
                 subData = self._pack_data(subAction, subActSpaceType)

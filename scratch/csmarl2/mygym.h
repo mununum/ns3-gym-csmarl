@@ -38,7 +38,7 @@ private:
 
   void ScheduleNextStateRead ();
   void StepState ();
-  void SetCw (Ptr<Node> node, uint32_t cwalue);
+  void SetCw (Ptr<Node> node, uint32_t cwValue);
   uint32_t GetCw (Ptr<Node> node);
 
   uint32_t GetQueueLength (Ptr<Node> node);

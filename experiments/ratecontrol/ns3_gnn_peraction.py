@@ -412,13 +412,14 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--debug", action="store_true")
     parser.add_argument("--topology", type=str, default="complex")
+    parser.add_argument("--id", type=int, default=0)
     args = parser.parse_args()
 
     ray.init(log_to_driver=args.debug, local_mode=args.debug)
 
     env_config = {
         "topology": args.topology,
-        "exp_name": __file__.split(".")[0],
+        "exp_name": __file__.split(".")[0]+"-"+str(args.id),
     }
 
     _, n_agents = graph.read_graph(env_config["topology"])

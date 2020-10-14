@@ -166,32 +166,35 @@ class Ns3GNNPerActionModel(RecurrentNetwork):
                             input_dim=hiddens_size,
                             output_dim=hiddens_size,
                             name="gcn1_0",
-                            activation=tf.nn.tanh)(adj, gnn_vf_in_0)
+                            activation=tf.nn.tanh)(adj, gnn_vf_in_0)  # (B, N, H)
         
         gnn_vf_dense2_0 = GraphConvLayer(
                             input_dim=hiddens_size,
                             output_dim=hiddens_size,
                             name="gcn2_0",
-                            activation=tf.nn.tanh)(adj, gnn_vf_dense1_0)
+                            activation=tf.nn.tanh)(adj, gnn_vf_dense1_0)  # (B, N, H)
 
         gnn_vf_dense1_1 = GraphConvLayer(
                             input_dim=hiddens_size,
                             output_dim=hiddens_size,
                             name="gcn1_1",
-                            activation=tf.nn.tanh)(adj, gnn_vf_in_1)
+                            activation=tf.nn.tanh)(adj, gnn_vf_in_1)  # (B, N, H)
         
         gnn_vf_dense2_1 = GraphConvLayer(
                             input_dim=hiddens_size,
                             output_dim=hiddens_size,
                             name="gcn2_1",
-                            activation=tf.nn.tanh)(adj, gnn_vf_dense1_1)
-        
+                            activation=tf.nn.tanh)(adj, gnn_vf_dense1_1)  # (B, N, H)
+
+        gnn_vf_concat_0 = tf.concat([gnn_vf_in_0, gnn_vf_dense1_0, gnn_vf_dense2_0], axis=-1)  # (B, N, H*3)
+        gnn_vf_concat_1 = tf.concat([gnn_vf_in_1, gnn_vf_dense1_1, gnn_vf_dense2_1], axis=-1)  # (B, N, H*3)
+
         gnn_vf_agg_0 = tf.keras.layers.Dense(
-            hiddens_size, activation=tf.nn.tanh, name="gnn_vf_agg_0")(gnn_vf_dense2_0)  # (B, N, H)
+            hiddens_size, activation=tf.nn.tanh, name="gnn_vf_agg_0")(gnn_vf_concat_0)  # (B, N, H)
         gnn_vf_agg_0 = tf.reduce_sum(gnn_vf_agg_0, axis=1)  # (B, H)
 
         gnn_vf_agg_1 = tf.keras.layers.Dense(
-            hiddens_size, activation=tf.nn.tanh, name="gnn_vf_agg_1")(gnn_vf_dense2_1)  # (B, N, H)
+            hiddens_size, activation=tf.nn.tanh, name="gnn_vf_agg_1")(gnn_vf_concat_1)  # (B, N, H)
         gnn_vf_agg_1 = tf.reduce_sum(gnn_vf_agg_1, axis=1)  # (B, H)
 
         gnn_vf_out_0 = tf.keras.layers.Dense(
@@ -427,7 +430,7 @@ if __name__ == "__main__":
     NUM_GPUS = 4
     num_workers = 8
     num_gpus_per_worker = NUM_GPUS / num_workers
-    timesteps_total = 3e8
+    timesteps_total = 5e8
 
     config = {
         "env": "ns3_multiagent_env",
@@ -436,7 +439,7 @@ if __name__ == "__main__":
         "num_workers": num_workers,
         "num_gpus_per_worker": num_gpus_per_worker,
         "sgd_minibatch_size": 2000,
-        "lr_schedule": [[0, 5e-5], [timesteps_total, 0.0]],
+        "lr_schedule": [[0, 5e-4], [timesteps_total, 0.0]],
         "env_config": env_config,
         "callbacks": MyCallbacks,
         "model": {

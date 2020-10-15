@@ -439,7 +439,7 @@ if __name__ == "__main__":
         "num_workers": num_workers,
         "num_gpus_per_worker": num_gpus_per_worker,
         "sgd_minibatch_size": 2000,
-        "lr_schedule": [[0, 5e-4], [timesteps_total, 0.0]],
+        "lr_schedule": [[0, 5e-5], [timesteps_total, 0.0]],
         "env_config": env_config,
         "callbacks": MyCallbacks,
         "model": {

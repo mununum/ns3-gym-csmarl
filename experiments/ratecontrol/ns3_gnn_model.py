@@ -157,16 +157,18 @@ class Ns3GNNModel(RecurrentNetwork):
                             input_dim=hiddens_size,
                             output_dim=hiddens_size,
                             name="gcn1",
-                            activation=tf.nn.tanh)(adj, gnn_vf_in)
+                            activation=tf.nn.tanh)(adj, gnn_vf_in)  # (B, N, H)
         
         gnn_vf_dense2 = GraphConvLayer(
                             input_dim=hiddens_size,
                             output_dim=hiddens_size,
                             name="gcn2",
-                            activation=tf.nn.tanh)(adj, gnn_vf_dense1)
+                            activation=tf.nn.tanh)(adj, gnn_vf_dense1)  # (B, N, H)
+
+        gnn_vf_concat = tf.concat([gnn_vf_in, gnn_vf_dense1, gnn_vf_dense2], axis=-1)  # (B, N, H*3)
         
         gnn_vf_agg = tf.keras.layers.Dense(
-            hiddens_size, activation=tf.nn.tanh, name="gnn_vf_agg")(gnn_vf_dense2)  # (B, N, H)
+            hiddens_size, activation=tf.nn.tanh, name="gnn_vf_agg")(gnn_vf_concat)  # (B, N, H)
         gnn_vf_agg = tf.reduce_sum(gnn_vf_agg, axis=1)  # (B, H)
 
         gnn_vf_out = tf.keras.layers.Dense(
@@ -374,7 +376,7 @@ if __name__ == "__main__":
     NUM_GPUS = 4
     num_workers = 8
     num_gpus_per_worker = NUM_GPUS / num_workers
-    timesteps_total = 3e8
+    timesteps_total = 5e8
 
     config = {
         "env": "ns3_multiagent_env",

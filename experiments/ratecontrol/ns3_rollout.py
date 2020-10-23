@@ -17,6 +17,7 @@ from ray.tune.utils import merge_dicts
 
 import ns3_rnn_model
 import ns3_gnn_model
+import ns3_gnn_peraction
 
 def prepare(args, parser):
     config = {}
@@ -55,6 +56,8 @@ def prepare(args, parser):
 
     if args.run == "GNNPPOTrainer":
         cls = ns3_gnn_model.GNNPPOTrainer
+    elif args.run == "GNNPerActionPPOTrainer":
+        cls = ns3_gnn_peraction.GNNPerActionPPOTrainer
     else:
         cls = get_trainable_cls(args.run)
     
@@ -206,7 +209,7 @@ if __name__ == "__main__":
     args.config = {
         "num_workers": 0,
         "env_config": {
-            # "debug": True,
+            "debug": True,
         },
         "multiagent": {
             "policies_to_train": ["nothing"]

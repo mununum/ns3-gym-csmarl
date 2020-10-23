@@ -1,15 +1,19 @@
-Ray Installation
+Installation
 ============
 
 1. Install ray-0.8.6 version.
 ```
 $ pip install ray==0.8.6
 ```
-2. Follow the instruction for dev mode setup.
+2. Follow the instruction for ray dev mode setup.
 https://docs.ray.io/en/master/development.html#building-ray-python-only
 ```
 $ cd ray
 $ python python/ray/setup-dev.py
+```
+3. Install dependencies.
+```
+$ pip install gputil
 ```
 
 

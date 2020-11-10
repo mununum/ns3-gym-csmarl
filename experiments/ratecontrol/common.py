@@ -15,7 +15,7 @@ def config(args):
     # NUM_GPUS = 2
     num_workers = 8
     num_gpus_per_worker = NUM_GPUS / num_workers
-    if env_config["topology"] == "fim":
+    if env_config["topology"] == "fim" or env_config["topology"].startswith("fc"):
         timesteps_total = 5e7
     elif env_config["topology"] == "random":
         timesteps_total = 5e8

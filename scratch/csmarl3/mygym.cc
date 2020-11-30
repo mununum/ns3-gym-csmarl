@@ -6,6 +6,8 @@
 
 namespace ns3 {
 
+NS_LOG_COMPONENT_DEFINE ("MyGymEnv");
+
 NS_OBJECT_ENSURE_REGISTERED (MyGymEnv);
 
 static inline double
@@ -305,6 +307,8 @@ MyGymEnv::GetObservation ()
 
       if (m_debug)
         std::cout << qlen << "\t";
+      // if (m_debug)
+      //   std::cout << agent->m_txPktNumEwma << "\t";
     }
 
   if (m_debug)
@@ -318,19 +322,21 @@ MyGymEnv::GetReward ()
 {
   NS_LOG_FUNCTION (this);
 
-  // const double epsilon = 1e-4;
-  float utility_reward = 1.0;
+  const double epsilon = 1e-5;
+  float utility_reward = 0.0;
   float queue_reward = 0.0;
 
   for (auto agent : m_agents)
     {
-      // utility_reward += std::log (agent->m_txPktNumEwma + epsilon);
-      utility_reward *= agent->m_txPktNumEwma;
+      utility_reward += std::log (agent->m_txPktNumEwma + epsilon);
+      // utility_reward *= agent->m_txPktNumEwma;
       queue_reward -= GetQueueLength (agent->m_node);
     }
 
+  queue_reward /= m_numAgents;
+
   utility_reward /= 1e3;
-  queue_reward /= 1e6;
+  queue_reward /= 1e5;
 
   m_utilityReward = utility_reward;
   m_queueReward = queue_reward;

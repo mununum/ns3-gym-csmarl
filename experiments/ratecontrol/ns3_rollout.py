@@ -214,7 +214,7 @@ if __name__ == "__main__":
         "multiagent": {
             "policies_to_train": ["nothing"]
         },
-        "explore": False,
+        "explore": True,
         "evaluation_interval": None,
     }
 

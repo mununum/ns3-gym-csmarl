@@ -201,6 +201,7 @@ if __name__ == "__main__":
     parser.add_argument("--checkpoint", type=str)
     parser.add_argument("--episodes", type=int, default=1)
     parser.add_argument("--config", default="{}", type=json.loads)
+    parser.add_argument("--topology", type=str, default=None)
 
     args = parser.parse_args()
 
@@ -217,6 +218,10 @@ if __name__ == "__main__":
         "explore": True,
         "evaluation_interval": None,
     }
+
+    if args.topology is not None:
+        print("using custom topology", args.topology)
+        args.config["env_config"]["topology"] = args.topology
 
     # load checkpoint
     agent = prepare(args, parser)

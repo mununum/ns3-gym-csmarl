@@ -26,8 +26,13 @@ class Ns3MultiAgentEnv(MultiAgentEnv):
         _, self.n_agents = graph.read_graph(self.topology)
         port = 0
 
+        simName = env_config.get("simName", "csmarl3")
+        topology2 = env_config.get("topology2", None)
+        if simName != "csmarl_dynamic":
+            assert topology2 is None, "topology2 argument can only be given in csmarl_dynamic simulator"
+
         d = os.path.dirname(os.path.abspath(__file__))
-        cwd = os.path.join(d, "../../scratch/csmarl3")
+        cwd = os.path.join(d, "../../scratch/" + simName)
 
         simTime = env_config.get("simTime", None)
         stepTime = env_config.get("stepTime", None)
@@ -38,6 +43,7 @@ class Ns3MultiAgentEnv(MultiAgentEnv):
         self.exp_name = env_config.get("exp_name", "default")
         if self.topology == "random":
             # random topology
+            assert simName == "csmarl3"
             self.topology_file = self.topology + "-" + self.exp_name
             if env_config.worker_index == 0:
                 graph.gen_graph(self.topology_file)
@@ -46,12 +52,14 @@ class Ns3MultiAgentEnv(MultiAgentEnv):
 
         simArgs = {
             "--topology": self.topology_file,
+            "--topology2": topology2,
             "--simTime": simTime,
             "--stepTime": stepTime,
             "--intensity": intensity,
             "--debug": self.debug,
             "--algorithm": "rl",
         }
+        # remove the argument with None value
         for k in list(simArgs):
             if simArgs[k] is None:
                 del simArgs[k]

@@ -19,6 +19,7 @@ public:
   double simTime = 20;
   double stepTime = 0.005;
   std::string topology = "single";
+  std::string topology2 = "";
   std::string algorithm = "80211";
   bool debug = false;
   double intensity = 1.0;
@@ -149,7 +150,8 @@ Ptr<MyGymEnv>
 SetupOpenGym (NodeContainer &srcNodes, const MyConfig &config)
 {
   Ptr<OpenGymInterface> openGymInterface = CreateObject<OpenGymInterface> (config.openGymPort);
-  Ptr<MyGymEnv> myGymEnv = CreateObject<MyGymEnv> (srcNodes, Seconds (config.stepTime), config.algorithm, config.debug);
+  Ptr<MyGymEnv> myGymEnv =
+      CreateObject<MyGymEnv> (srcNodes, Seconds (config.stepTime), config.algorithm, config.debug);
 
   myGymEnv->SetOpenGymInterface (openGymInterface);
 
@@ -162,20 +164,50 @@ SetupOpenGym (NodeContainer &srcNodes, const MyConfig &config)
       Ptr<WifiMac> wifi_mac = wifi_dev->GetMac ();
       Ptr<RegularWifiMac> rmac = DynamicCast<RegularWifiMac> (wifi_mac);
 
-      rmac->TraceConnectWithoutContext (
-        "TxOkHeader", MakeBoundCallback (&MyGymEnv::SrcTxDone, myGymEnv, i));
-      
+      rmac->TraceConnectWithoutContext ("TxOkHeader",
+                                        MakeBoundCallback (&MyGymEnv::SrcTxDone, myGymEnv, i));
+
       Ptr<WifiPhy> phy = rmac->GetWifiPhy ();
       PointerValue ptr;
       phy->GetAttribute ("State", ptr);
       Ptr<WifiPhyStateHelper> phy_state = ptr.Get<WifiPhyStateHelper> ();
       phy_state->TraceConnectWithoutContext (
-        "State", MakeBoundCallback (&MyGymEnv::PhyStateChange, myGymEnv, i));
+          "State", MakeBoundCallback (&MyGymEnv::PhyStateChange, myGymEnv, i));
     }
 
   return myGymEnv;
 }
 
+void
+ChangeGraph (NodeContainer &nodes, const Ptr<const Graph> newGraph)
+{
+  Ptr<WifiNetDevice> wifiDev = DynamicCast<WifiNetDevice> (nodes.Get (0)->GetDevice (0));
+  Ptr<WifiPhy> wifiPhy = wifiDev->GetPhy ();
+  Ptr<SpectrumChannel> spectrumChannel = DynamicCast<SpectrumChannel> (wifiPhy->GetChannel ());
+
+  PointerValue ptr;
+  spectrumChannel->GetAttribute ("PropagationLossModel", ptr);
+  Ptr<PropagationLossModel> lossModel = ptr.Get<PropagationLossModel> ();
+
+  Ptr<MatrixPropagationLossModel> matrixLossModel =
+      DynamicCast<MatrixPropagationLossModel> (lossModel);
+
+  // std::cout << matrixLossModel << " " << matrixLossModel->GetNext () << std::endl;
+
+  Ptr<MatrixPropagationLossModel> newLossModel = CreateObject<MatrixPropagationLossModel> ();
+
+  for (auto it = newGraph->EdgeBegin (); it != newGraph->EdgeEnd (); it++)
+    {
+      Ptr<MobilityModel> mobilityA = nodes.Get (it->first)->GetObject<MobilityModel> ();
+      Ptr<MobilityModel> mobilityB = nodes.Get (it->second)->GetObject<MobilityModel> ();
+
+      newLossModel->SetLoss (mobilityA, mobilityB, 0); // symmetric
+    }
+
+  spectrumChannel->SetAttribute ("PropagationLossModel", PointerValue (newLossModel));
+
+  std::cout << "changed loss model" << std::endl;
+}
 
 int
 main (int argc, char *argv[])
@@ -189,11 +221,15 @@ main (int argc, char *argv[])
   cmd.AddValue ("stepTime", "Step time of the environment, Default: 0.005s", config.stepTime);
   cmd.AddValue ("topology", "Interference topology. (on graph file), Default: single",
                 config.topology);
+  cmd.AddValue ("topology2", "Topology to change into during simulation, Default: (don't change)",
+                config.topology2);
   cmd.AddValue ("algorithm", "MAC algorithm to use (80211|odcf|rl). Default: 80211",
                 config.algorithm);
   cmd.AddValue ("debug", "Print debug message. Default: false", config.debug);
   cmd.AddValue ("intensity", "Intensity of the traffic. Default: 1.0", config.intensity);
   cmd.Parse (argc, argv);
+
+  std::cout << "this is csmarl_dynamic environment" << std::endl;
 
   RngSeedManager::SetSeed (1);
   RngSeedManager::SetRun (config.simSeed);
@@ -211,6 +247,16 @@ main (int argc, char *argv[])
   NodeContainer srcNodes = SetupApplication (nodes, graph, config);
 
   Ptr<MyGymEnv> myGymEnv = SetupOpenGym (srcNodes, config);
+
+  // topology changing event
+  if (config.topology2 != "")
+    {
+      Ptr<Graph> newGraph = ReadLinkGraph (config.topology2);
+      NS_ASSERT_MSG (graph->GetNNodes () == newGraph->GetNNodes (),
+                    "Both topology has to have same number of nodes");
+      Simulator::Schedule (Seconds (config.simTime / 2), &ChangeGraph, nodes, newGraph);
+    }
+  // if topology2 == "", don't change the topology during simulation
 
   Simulator::Stop (Seconds (config.simTime));
   Simulator::Run ();

@@ -202,6 +202,7 @@ if __name__ == "__main__":
     parser.add_argument("--episodes", type=int, default=1)
     parser.add_argument("--config", default="{}", type=json.loads)
     parser.add_argument("--topology", type=str, default=None)
+    # parser.add_argument("--topology2", type=str, default=None)
 
     args = parser.parse_args()
 
@@ -211,6 +212,8 @@ if __name__ == "__main__":
         "num_workers": 0,
         "env_config": {
             "debug": True,
+            # "simName": "csmarl_dynamic",
+            # "toplogy2": None,
         },
         "multiagent": {
             "policies_to_train": ["nothing"]

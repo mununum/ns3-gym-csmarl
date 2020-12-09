@@ -305,12 +305,10 @@ MyGymEnv::GetObservation ()
 
       tuple->Add (box);
 
-      // if (m_debug)
-      //   std::cout << qlen << "\t";
+      if (m_debug)
+        std::cout << qlen << "\t";
       // if (m_debug)
       //   std::cout << agent->m_txPktNumEwma << "\t";
-      if (m_debug)
-        std::cout << agent->m_txPktNum - agent->m_txPktNumLastVal << "\t";
     }
 
   if (m_debug)

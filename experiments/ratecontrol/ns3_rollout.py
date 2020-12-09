@@ -202,7 +202,7 @@ if __name__ == "__main__":
     parser.add_argument("--episodes", type=int, default=1)
     parser.add_argument("--config", default="{}", type=json.loads)
     parser.add_argument("--topology", type=str, default=None)
-    # parser.add_argument("--topology2", type=str, default=None)
+    parser.add_argument("--topology2", type=str, default=None)
 
     args = parser.parse_args()
 
@@ -225,6 +225,10 @@ if __name__ == "__main__":
     if args.topology is not None:
         print("using custom topology", args.topology)
         args.config["env_config"]["topology"] = args.topology
+
+    if args.topology2 is not None:
+        print("the topology will change into", args.topology2)
+        args.config["env_config"]["topology2"] = args.topology2
 
     # load checkpoint
     agent = prepare(args, parser)

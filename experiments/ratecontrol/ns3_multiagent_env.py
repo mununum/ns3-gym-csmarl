@@ -29,7 +29,8 @@ class Ns3MultiAgentEnv(MultiAgentEnv):
         simName = env_config.get("simName", "csmarl3")
         topology2 = env_config.get("topology2", None)
         if simName != "csmarl_dynamic":
-            assert topology2 is None, "topology2 argument can only be given in csmarl_dynamic simulator"
+            # ignore topology2 argument unless simName is csmarl_dynamic
+            topology2 = None
 
         d = os.path.dirname(os.path.abspath(__file__))
         cwd = os.path.join(d, "../../scratch/" + simName)

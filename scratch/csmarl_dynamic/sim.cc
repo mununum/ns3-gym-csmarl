@@ -192,8 +192,6 @@ ChangeGraph (NodeContainer &nodes, const Ptr<const Graph> newGraph)
   Ptr<MatrixPropagationLossModel> matrixLossModel =
       DynamicCast<MatrixPropagationLossModel> (lossModel);
 
-  // std::cout << matrixLossModel << " " << matrixLossModel->GetNext () << std::endl;
-
   Ptr<MatrixPropagationLossModel> newLossModel = CreateObject<MatrixPropagationLossModel> ();
 
   for (auto it = newGraph->EdgeBegin (); it != newGraph->EdgeEnd (); it++)
@@ -206,7 +204,7 @@ ChangeGraph (NodeContainer &nodes, const Ptr<const Graph> newGraph)
 
   spectrumChannel->SetAttribute ("PropagationLossModel", PointerValue (newLossModel));
 
-  std::cout << "changed loss model" << std::endl;
+  // std::cout << "changed loss model" << std::endl;
 }
 
 int
@@ -229,7 +227,7 @@ main (int argc, char *argv[])
   cmd.AddValue ("intensity", "Intensity of the traffic. Default: 1.0", config.intensity);
   cmd.Parse (argc, argv);
 
-  std::cout << "this is csmarl_dynamic environment" << std::endl;
+  // std::cout << "this is csmarl_dynamic environment" << std::endl;
 
   RngSeedManager::SetSeed (1);
   RngSeedManager::SetRun (config.simSeed);

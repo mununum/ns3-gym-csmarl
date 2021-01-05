@@ -63,7 +63,7 @@ protected:
   Time m_totalCCADuration;
   Time m_busyCCADuration;
 
-  Ptr<DelayJitterEstimation2> m_delayEstimator;  // for HOL delay
+  Ptr<DelayJitterEstimation2> m_delayEstimator;  // for e2e delay
 };
 
 MyGymEnv::MyGymEnv ()
@@ -272,7 +272,7 @@ MyGymEnv::GetObservation ()
 
       // Average throughput
 
-      // HOL latency
+      // e2e latency
       double lat = agent->m_e2eDelayEwma;
       lat /= 1e9;
 
@@ -451,10 +451,10 @@ MyGymEnv::SrcTxDone (Ptr<MyGymEnv> entity, uint32_t idx, const WifiMacHeader &hd
       Ptr<MyGymAgent> agent = entity->m_agents[idx];
       agent->m_txPktNum++;
 
-      agent->m_delayEstimator->RecordRx (packet);  // HOL delay
+      agent->m_delayEstimator->RecordRx (packet);  // e2e delay
       Time e2eDelay = agent->m_delayEstimator->GetLastDelay ();
 
-      // EWMA update the HOL delay
+      // EWMA update the e2e delay
       const double ewmaWeight = 0.9;
       if (agent->m_txPktNum == 1)
         agent->m_e2eDelayEwma = e2eDelay.GetDouble ();

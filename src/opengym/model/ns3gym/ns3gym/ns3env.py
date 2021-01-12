@@ -2,6 +2,7 @@ import os
 import sys
 import zmq
 import time
+import signal
 
 import numpy as np
 

@@ -48,3 +48,4 @@ scratch/csmarl/out
 out/*
 experiments/ratecontrol/random_graph_result/*
 experiments/ratecontrol/random_graph_result_odcf/*
+docker/*.tar

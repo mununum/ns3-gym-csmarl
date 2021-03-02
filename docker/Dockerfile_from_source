@@ -1,0 +1,8 @@
+FROM ns3-gym-csmarl:base
+
+# copy source
+COPY ./ /src
+RUN ./waf configure -d optimized && ./waf build
+RUN pip install ./src/opengym/model/ns3gym
+
+EXPOSE 6006

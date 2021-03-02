@@ -299,7 +299,7 @@ if __name__ == "__main__":
     parser.add_argument("--id", type=int, default=0)
     args = parser.parse_args()
 
-    ray.init(log_to_driver=args.debug, local_mode=args.debug)
+    ray.init(log_to_driver=args.debug, local_mode=args.debug, include_webui=False)
 
     config, stop = common.config(args)
     _, n_agents = graph.read_graph(args.topology)

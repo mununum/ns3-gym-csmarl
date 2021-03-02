@@ -1,0 +1,12 @@
+FROM ns3-gym-csmarl:base
+
+# checkout repo
+RUN git clone https://github.com/mununum/ns3-gym-csmarl.git 
+WORKDIR /src/ns3-gym-csmarl
+RUN git checkout develop
+
+# install ns3gym
+RUN ./waf configure -d optimized && ./waf build
+RUN pip install ./src/opengym/model/ns3gym
+
+EXPOSE 6006

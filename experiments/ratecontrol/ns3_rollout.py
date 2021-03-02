@@ -52,7 +52,7 @@ def prepare(args, parser):
             parser.error("the following arguments are required: --env")
         args.env = config.get("env")
 
-    ray.init()
+    ray.init(include_webui=False)
 
     if args.run == "GNNPPOTrainer":
         cls = ns3_gnn_model.GNNPPOTrainer
@@ -173,8 +173,14 @@ def rollout(agent,
 
 def load_checkpoint(exp_str):
 
-    alg = exp_str.split("_")[0]
-
+    # presume the rollout is running inside container
+    if exp_str == "":
+        alg = os.listdir(os.path.expanduser("~/ray_results/"))
+        alg = sorted(alg)[0]
+        exp_str = alg
+    else:
+        alg = exp_str.split("_")[0]
+    
     exp_str_pattern = "~/ray_results/" + alg + "/" + exp_str + "*"
     path = glob.glob(os.path.expanduser(exp_str_pattern))
     if len(path) != 1:
@@ -192,7 +198,7 @@ def load_checkpoint(exp_str):
 
 if __name__ == "__main__":
     
-    exp_str = "FILL_HERE"
+    exp_str = ""
 
     parser = argparse.ArgumentParser()
 

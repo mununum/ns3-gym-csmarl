@@ -1,0 +1,15 @@
+FROM tensorflow/tensorflow:latest-gpu
+
+RUN add-apt-repository ppa:maarten-fonville/protobuf && apt-get update
+RUN apt-get install -y libzmq5 libzmq5-dev libprotobuf-dev protobuf-compiler git rsync
+RUN pip install --upgrade pip
+RUN pip install gputil networkx matplotlib pyzmq
+
+WORKDIR /
+RUN git clone https://github.com/mununum/ray.git
+WORKDIR /ray
+RUN git checkout mybranch
+RUN pip install ray[rllib]==0.8.6
+RUN python python/ray/setup-dev.py --yes
+RUN mkdir /src
+WORKDIR /src

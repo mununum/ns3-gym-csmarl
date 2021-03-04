@@ -47,7 +47,7 @@ class Ns3MultiAgentEnv(MultiAgentEnv):
             assert simName == "csmarl3"
             self.topology_file = self.topology + "-" + self.exp_name
             if env_config.worker_index == 0:
-                graph.gen_graph(self.topology_file)
+                graph.gen_graph(self.topology_file, sigma=env_config.get("sigma", 0))
         else:
             self.topology_file = self.topology
 
@@ -164,7 +164,7 @@ def renew_graph(config, item):
     if config["env_config"]["topology"] == "random":
         exp_name = config["env_config"].get("exp_name", "default")
         topology_file = config["env_config"]["topology"] + "-" + exp_name
-        graph.gen_graph(topology_file)
+        graph.gen_graph(topology_file, sigma=config["env_config"].get("sigma", 0))
 
     return item
 

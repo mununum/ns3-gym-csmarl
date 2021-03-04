@@ -6,7 +6,8 @@ from ns3_multiagent_env import MyCallbacks
 def config(args):
 
     env_config = {
-        "topology": args.topology
+        "topology": args.topology,
+        "sigma": getattr(args, "sigma", 0)  # MYTODO fix this
     }
 
     gpus = GPUtil.getGPUs()

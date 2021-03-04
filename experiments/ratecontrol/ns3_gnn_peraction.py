@@ -416,6 +416,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--debug", action="store_true")
     parser.add_argument("--topology", type=str, default="complex")
+    parser.add_argument("--sigma", type=float, default=0)
     parser.add_argument("--id", type=int, default=0)
     args = parser.parse_args()
 

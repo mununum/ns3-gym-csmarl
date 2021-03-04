@@ -1,5 +1,6 @@
 import os
 import sys
+import random
 import networkx as nx
 import matplotlib.pyplot as plt
 
@@ -52,10 +53,12 @@ def read_graph(name):
 
     return G, N
 
-def gen_graph(name):
+def gen_graph(name, sigma=0):
     
     # randomly generate graph
-    G = nx.random_geometric_graph(10, 0.3)
+    d = random.normalvariate(0.3, sigma)
+    d = max(d, 0)
+    G = nx.random_geometric_graph(10, d)
     dump_graph_txt(name, G)
 
 if __name__ == "__main__":

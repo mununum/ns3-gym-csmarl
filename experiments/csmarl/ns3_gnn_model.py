@@ -364,7 +364,7 @@ if __name__ == "__main__":
         "exp_name": __file__.split(".")[0],
     }
 
-    _, n_agents = graph.read_graph(env_config["topology"])
+    _, n_agents = graph.read_link_graph(env_config["topology"])
 
     NUM_GPUS = 4
     num_workers = 8

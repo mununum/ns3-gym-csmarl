@@ -1,4 +1,5 @@
 import os
+import sys
 import gym
 import numpy as np
 from collections import defaultdict
@@ -11,6 +12,7 @@ from ray.rllib.execution.metric_ops import StandardMetricsReporting
 from ray.rllib.execution.rollout_ops import ParallelRollouts, ConcatBatches, StandardizeFields, SelectExperiences
 from ray.rllib.execution.train_ops import TrainOneStep, TrainTFMultiGPU
 from ray.tune.registry import register_env
+from ray.tune.utils import merge_dicts
 from ns3gym import ns3env
 
 from ns3_import import import_graph_module
@@ -21,16 +23,27 @@ class Ns3MultiAgentEnv(MultiAgentEnv):
 
         graph = import_graph_module()
 
+        simName = env_config.get("simName", "csmarl3")
+
         self.topology = env_config.get("topology", None)
         assert self.topology, "topology is needed to be specified"
-        _, self.n_agents = graph.read_graph(self.topology)
-        port = 0
 
-        simName = env_config.get("simName", "csmarl3")
-        topology2 = env_config.get("topology2", None)
-        if simName != "csmarl_dynamic":
-            # ignore topology2 argument unless simName is csmarl_dynamic
-            topology2 = None
+        if simName == "csmarl3":
+            # use link graph topology for training
+            _, self.n_agents = graph.read_link_graph(self.topology)
+        elif simName == "csmarl_test":
+            if env_config["testArgs"]["--loss"] == "graph":
+                if env_config["testArgs"]["--layout"] == "node":
+                    _, self.n_agents = graph.read_node_graph(self.topology)
+                elif env_config["testArgs"]["--layout"] == "link":
+                    _, self.n_agents = graph.read_link_graph(self.topology)
+            elif env_config["testArgs"]["--loss"] == "geometric":
+                # "topology" argument must be the form of N,d
+                if len(env_config["topology"].split(",")) != 2:
+                    print("invalid configuration, \"topology\" argument must be the form of N,d")
+                    sys.exit(1)
+                self.n_agents = int(env_config["topology"].split(",")[0])
+        port = 0
 
         d = os.path.dirname(os.path.abspath(__file__))
         cwd = os.path.join(d, "../../scratch/" + simName)
@@ -42,24 +55,27 @@ class Ns3MultiAgentEnv(MultiAgentEnv):
 
         # random topology generation
         self.exp_name = env_config.get("exp_name", "default")
-        if self.topology == "random":
+        if simName == "csmarl3" and self.topology == "random":
             # random topology
-            assert simName == "csmarl3"
             self.topology_file = self.topology + "-" + self.exp_name
             if env_config.worker_index == 0:
-                graph.gen_graph(self.topology_file, sigma=env_config.get("sigma", 0))
+                graph.gen_link_graph(self.topology_file, sigma=env_config.get("sigma", 0))
         else:
             self.topology_file = self.topology
 
         simArgs = {
             "--topology": self.topology_file,
-            "--topology2": topology2,
             "--simTime": simTime,
             "--stepTime": stepTime,
-            "--intensity": intensity,
             "--debug": self.debug,
             "--algorithm": "rl",
         }
+
+        # arguments for csmarl_test
+        if simName == "csmarl_test":
+            testArgs = env_config.get("testArgs", {})
+            simArgs = merge_dicts(simArgs, testArgs)
+
         # remove the argument with None value
         for k in list(simArgs):
             if simArgs[k] is None:
@@ -136,7 +152,7 @@ class MyCallbacks(DefaultCallbacks):
 
     def on_episode_start(self, worker, base_env, policies, episode, **kwargs):
         env = base_env.envs[0]
-        episode.user_data["graph"], _ = graph.read_graph(env.topology_file)
+        episode.user_data["graph"], _ = graph.read_link_graph(env.topology_file)
         episode.user_data["stat"] = defaultdict(list)
 
     def on_episode_step(self, worker, base_env, episode, **kwargs):
@@ -164,7 +180,7 @@ def renew_graph(config, item):
     if config["env_config"]["topology"] == "random":
         exp_name = config["env_config"].get("exp_name", "default")
         topology_file = config["env_config"]["topology"] + "-" + exp_name
-        graph.gen_graph(topology_file, sigma=config["env_config"].get("sigma", 0))
+        graph.gen_link_graph(topology_file, sigma=config["env_config"].get("sigma", 0))
 
     return item
 

@@ -46,7 +46,7 @@ def config(args):
             "evaluation_num_workers": num_eval_workers,
             "evaluation_num_episodes": num_eval_workers,
             "evaluation_config": {
-                "env_config": {"topology": "complex"},
+                "env_config": {"topology": "complex1"},
                 "explore": False,
             },
             "num_gpus_per_worker": num_gpus_per_worker,

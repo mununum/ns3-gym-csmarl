@@ -1,3 +1,4 @@
+#include <random>
 #include "ns3/core-module.h"
 #include "ns3/internet-module.h"
 #include "ns3/node-list.h"
@@ -38,26 +39,26 @@ Graph::AddFlow (const uint32_t a, const uint32_t b)
   nFlows++;
 }
 
-Ptr<Graph>
+static Ptr<Graph>
 ReadLinkGraph (const std::string topology)
 {
   Ptr<Graph> graph = CreateObject<Graph> ();
-  std::ifstream graph_file;
-  const std::string graph_file_name = "graphs/link/" + topology + ".txt";
+  std::ifstream graphFile;
+  const std::string graphFileName = "graphs/link/" + topology + ".txt";
   uint32_t n;
 
-  graph_file.open (graph_file_name);
-  if (graph_file.fail ())
+  graphFile.open (graphFileName);
+  if (graphFile.fail ())
     {
-      NS_FATAL_ERROR ("File " << graph_file_name << " not found");
+      NS_FATAL_ERROR ("File " << graphFileName << " not found");
     }
 
   // position
-  graph_file >> n;
+  graphFile >> n;
   for (uint32_t i = 0; i < n; i++)
     {
       float a, b;
-      graph_file >> a >> b;
+      graphFile >> a >> b;
 
       // sender and receiver in identical locations
       graph->AddNode (a, b);
@@ -71,11 +72,11 @@ ReadLinkGraph (const std::string topology)
     }
 
   // interferences between links
-  graph_file >> n;
+  graphFile >> n;
   for (uint32_t i = 0; i < n; i++)
     {
       uint32_t a, b;
-      graph_file >> a >> b;
+      graphFile >> a >> b;
 
       uint32_t a_tx = a * 2;
       uint32_t a_rx = a * 2 + 1;
@@ -88,7 +89,120 @@ ReadLinkGraph (const std::string topology)
       graph->AddEdge (a_rx, b_rx);
     }
 
-  graph_file.close ();
+  graphFile.close ();
+
+  return graph;
+}
+
+static Ptr<Graph>
+ReadNodeGraph (const std::string topology)
+{
+  Ptr<Graph> graph = CreateObject<Graph> ();
+  std::ifstream graphFile;
+  const std::string graphFileName = "graphs/node/" + topology + ".txt";
+  uint32_t n;
+
+  graphFile.open (graphFileName);
+  if (graphFile.fail ())
+    {
+      NS_FATAL_ERROR ("File " << graphFileName << " not found");
+    }
+
+  // position
+  graphFile >> n;
+  for (uint32_t i = 0; i < n; i++)
+    {
+      float a, b;
+      graphFile >> a >> b;
+      graph->AddNode (a, b);
+    }
+
+  // interferences
+  graphFile >> n;
+  for (uint32_t i = 0; i < n; i++)
+    {
+      uint32_t a, b;
+      graphFile >> a >> b;
+      graph->AddEdge (a, b);
+    }
+
+  // flow pairs
+  graphFile >> n;
+  for (uint32_t i = 0; i < n; i++)
+    {
+      uint32_t a, b;
+      graphFile >> a >> b;
+      graph->AddFlow (a, b);
+    }
+
+  graphFile.close ();
+
+  return graph;
+}
+
+Ptr<Graph>
+BuildGraph (const MyConfig &config)
+{
+  // if config.loss == graph: build graph interference topology
+  // if config.loss == geometry: make graph without edges
+
+  Ptr<Graph> graph;
+
+  if (config.loss == "graph")
+    {
+      // check graph file
+      if (config.layout == "node")
+        graph = ReadNodeGraph (config.topology);
+      else if (config.layout == "link")
+        graph = ReadLinkGraph (config.topology);
+    }
+  else if (config.loss == "geometric")
+    {
+      graph = CreateObject<Graph> ();
+
+      std::random_device rd;
+      std::mt19937 g (rd ());
+      g.seed (config.graphSeed);
+      std::uniform_real_distribution<> u (0.0, 1.0);
+
+      if (config.layout == "node")
+        {
+          // make nFlows * 2 nodes
+          // the nodes have different positions
+          // uniform random placement within unit square
+          for (uint32_t i = 0; i < config.nFlows; i++)
+            {
+              float x = u (g);
+              float y = u (g);
+              graph->AddNode (x, y);  // i*2 th node
+
+              x = u (g);
+              y = u (g);
+              graph->AddNode (x, y);  // i*2+1 th node
+
+              uint32_t tx = i * 2;
+              uint32_t rx = i * 2 + 1;
+              graph->AddFlow (tx, rx);
+            }
+        }
+      else if (config.layout == "link")
+        {
+          // make nFlows * 2 noes
+          // the pair of nodes have different positions
+          // uniform random placement within unit square
+          for (uint32_t i = 0; i < config.nFlows; i++)
+            {
+              float x = u (g);
+              float y = u (g);
+              graph->AddNode (x, y);  // i*2 th node
+              graph->AddNode (x, y);  // i*2+1 th node
+
+              uint32_t tx = i * 2;
+              uint32_t rx = i * 2 + 1;
+              graph->AddFlow (tx, rx);
+            }
+        }
+    }
 
   return graph;
 }

@@ -23,7 +23,7 @@ class Ns3MultiAgentEnv(MultiAgentEnv):
 
         self.topology = env_config.get("topology", None)
         assert self.topology, "topology is needed to be specified"
-        _, self.n_agents = graph.read_graph(self.topology)
+        _, self.n_agents = graph.read_link_graph(self.topology)
         port = 0
 
         d = os.path.dirname(os.path.abspath(__file__))
@@ -40,7 +40,7 @@ class Ns3MultiAgentEnv(MultiAgentEnv):
             # random topology
             self.topology_file = self.topology + "-" + self.exp_name
             if env_config.worker_index == 0:
-                graph.gen_graph(self.topology_file)
+                graph.gen_link_graph(self.topology_file)
         else:
             self.topology_file = self.topology
 
@@ -123,7 +123,7 @@ class MyCallbacks(DefaultCallbacks):
 
     def on_episode_start(self, worker, base_env, policies, episode, **kwargs):
         env = base_env.envs[0]
-        episode.user_data["graph"], _ = graph.read_graph(env.topology_file)
+        episode.user_data["graph"], _ = graph.read_link_graph(env.topology_file)
         episode.user_data["stat"] = defaultdict(list)
 
     def on_episode_step(self, worker, base_env, episode, **kwargs):
@@ -144,7 +144,7 @@ def renew_graph(config, item):
     if config["env_config"]["topology"] == "random":
         exp_name = config["env_config"].get("exp_name", "default")
         topology_file = config["env_config"]["topology"] + "-" + exp_name
-        graph.gen_graph(topology_file)
+        graph.gen_link_graph(topology_file)
 
     return item
 

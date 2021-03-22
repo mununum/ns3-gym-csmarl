@@ -1,6 +1,7 @@
 #!/bin/bash
 
 count=0
+mkdir -p random_graph_result
 
 for N in `seq 20 -2 2`
 do
@@ -8,10 +9,10 @@ do
     do
         for i in `seq 0 4`
         do
-            python ns3_rollout.py --topology=complex_graphs/complex-$N-$d-$i --episodes=5 > random_graph_result_complex_single/complex-$N-$d-$i.out &
+            python ns3_rollout.py --loss=geometric --topology=$N,$d --graphSeed=$i --episodes=5 > random_graph_result/geometric-$N-$d-$i.out &
             count=$((count+1))
 
-            if [ $count -ge 16 ]
+            if [ $count -ge 4 ]
             then
                 wait
                 count=0

@@ -110,7 +110,7 @@ if __name__ == "__main__":
     ray.init(log_to_driver=args.debug, local_mode=args.debug, include_webui=False)
 
     config, stop = common.config(args)
-    _, n_agents = graph.read_graph(args.topology)
+    _, n_agents = graph.read_link_graph(args.topology)
 
     config["env_config"]["exp_name"] = __file__.split(".")[0]+"-"+str(args.id)
     config["model"] = {

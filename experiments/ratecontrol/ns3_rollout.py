@@ -40,8 +40,6 @@ def prepare(args, parser):
         with open(config_path, "rb") as f:
             config = pickle.load(f)
 
-    # Set num_workers to be at least 2.
-
     # Merge with `evaluation_config`.
     evaluation_config = copy.deepcopy(config.get("evaluation_config", {}))
     config = merge_dicts(config, evaluation_config)
@@ -207,8 +205,14 @@ if __name__ == "__main__":
     parser.add_argument("--checkpoint", type=str)
     parser.add_argument("--episodes", type=int, default=1)
     parser.add_argument("--config", default="{}", type=json.loads)
-    parser.add_argument("--topology", type=str, default=None)
-    parser.add_argument("--topology2", type=str, default=None)
+
+    # test arguments
+    parser.add_argument("--graphSeed", type=int, default=0)  # seed for geometric graph generation
+    parser.add_argument("--layout", type=str, default="link")  # node|link
+    parser.add_argument("--loss", type=str, default="graph")  # graph|geometric
+    parser.add_argument("--topology", type=str, default=None)  # graph file when graph, N,d when geometric
+    parser.add_argument("--mobility", type=str, default="fixed")  # fixed|paired|random
+    parser.add_argument("--intensity", action="store_true")  # true: intensity experiment
 
     args = parser.parse_args()
 
@@ -218,8 +222,13 @@ if __name__ == "__main__":
         "num_workers": 0,
         "env_config": {
             "debug": True,
-            # "simName": "csmarl_dynamic",
-            # "toplogy2": None,
+            "simName": "csmarl_test",
+            "testArgs": {  # additional arguments for csmarl_test
+                "--graphSeed": args.graphSeed,
+                "--layout": args.layout,
+                "--loss": args.loss,
+                "--mobility": args.mobility,
+            }
         },
         "multiagent": {
             "policies_to_train": ["nothing"]
@@ -232,18 +241,15 @@ if __name__ == "__main__":
         print("using custom topology", args.topology)
         args.config["env_config"]["topology"] = args.topology
 
-    if args.topology2 is not None:
-        print("the topology will change into", args.topology2)
-        args.config["env_config"]["topology2"] = args.topology2
-
     # load checkpoint
     agent = prepare(args, parser)
 
-    # Do the actual rollout.
-    rollout(agent, args.env, num_episodes=args.episodes)
-
-    # Intensity experiment.
-    # newargs = {"--intensity": 0.1}
-    # for i in range(10):
-    #     rollout(agent, args.env, newargs=newargs)
-    #     newargs["--intensity"] += 0.1
+    if args.intensity:
+        # Intensity experiment.
+        newargs = {"--intensity": 0.1}
+        for i in range(10):
+            rollout(agent, args.env, newargs=newargs)
+            newargs["--intensity"] += 0.1
+    else:
+        # Do the actual rollout.
+        rollout(agent, args.env, num_episodes=args.episodes)

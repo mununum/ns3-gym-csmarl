@@ -228,7 +228,7 @@ def renew_graph(config, item):
     if config["env_config"]["topology"] == "random":
         exp_name = config["env_config"].get("exp_name", "default")
         topology_file = config["env_config"]["topology"] + "-" + exp_name
-        graph.gen_graph(topology_file, sigma=config["env_config"].get("sigma", 0))
+        graph.gen_link_graph(topology_file, sigma=config["env_config"].get("sigma", 0))
     
     return item
 

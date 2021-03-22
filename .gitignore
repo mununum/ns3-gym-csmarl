@@ -50,3 +50,4 @@ experiments/ratecontrol/random_graph_result/*
 experiments/ratecontrol/random_graph_result_odcf/*
 docker/*.tar
 experiments/graphs/random-*
+graphs/link/random-*

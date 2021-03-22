@@ -55,8 +55,10 @@ def config(args):
 
     if args.debug:
         env_config["simTime"] = 1
+        env_config["debug"] = True
         config["log_level"] = "DEBUG"
         config["num_workers"] = 0
+        config["env_config"] = env_config
 
     stop = {
         "timesteps_total": timesteps_total,

@@ -7,6 +7,7 @@ def config(args):
 
     env_config = {
         "topology": args.topology,
+        "threshold": getattr(args, "threshold", 0.3),
         "sigma": getattr(args, "sigma", 0)  # MYTODO fix this
     }
 

@@ -73,12 +73,13 @@ def read_node_graph(name):
 
     return None, F
 
-def gen_link_graph(name, sigma=0):
+def gen_link_graph(name, threshold=0.3, sigma=0):
     
     # randomly generate graph
-    d = random.normalvariate(0.3, sigma)
+    d = random.normalvariate(threshold, sigma)
     d = max(d, 0)
     G = nx.random_geometric_graph(10, d)
+    print("Generate G(10, {})".format(d))
     dump_link_graph_txt(name, G)
 
 if __name__ == "__main__":

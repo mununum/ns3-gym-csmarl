@@ -38,7 +38,7 @@ def config(args):
         "callbacks": MyCallbacks,
     }
 
-    if env_config["topology"] == "random":
+    if env_config["topology"] == "random" and env_config["threshold"] == 0.3:
         # add evaluation config
         num_eval_workers = 4
         num_gpus_per_worker = NUM_GPUS / (num_workers + num_eval_workers)

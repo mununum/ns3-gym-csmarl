@@ -1,5 +1,11 @@
 #!/bin/bash
 
+if [ $# -lt 1 ]; then
+    echo "usage:" $0 "[batch_size]"
+    exit 1
+fi
+batch_size=$1
+
 count=0
 mkdir -p random_graph_result
 
@@ -12,7 +18,7 @@ do
             python ns3_rollout.py --loss=geometric --topology=$N,$d --graphSeed=$i --episodes=5 > random_graph_result/geometric-$N-$d-$i.out &
             count=$((count+1))
 
-            if [ $count -ge 4 ]
+            if [ $count -ge $batch_size ]
             then
                 wait
                 count=0

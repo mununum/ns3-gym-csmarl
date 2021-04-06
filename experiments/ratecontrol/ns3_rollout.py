@@ -207,6 +207,7 @@ if __name__ == "__main__":
     parser.add_argument("--config", default="{}", type=json.loads)
 
     # test arguments
+    parser.add_argument("--simSeed", type=int, default=0)  # seed for simulation
     parser.add_argument("--graphSeed", type=int, default=0)  # seed for geometric graph generation
     parser.add_argument("--layout", type=str, default="link")  # node|link
     parser.add_argument("--loss", type=str, default="graph")  # graph|geometric
@@ -223,6 +224,7 @@ if __name__ == "__main__":
         "env_config": {
             "debug": True,
             "simName": "csmarl_test",
+            "seed": args.simSeed,
             "testArgs": {  # additional arguments for csmarl_test
                 "--graphSeed": args.graphSeed,
                 "--layout": args.layout,

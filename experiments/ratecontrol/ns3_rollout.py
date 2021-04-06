@@ -224,7 +224,7 @@ if __name__ == "__main__":
         "env_config": {
             "debug": True,
             "simName": "csmarl_test",
-            "seed": args.simSeed,
+            "seed": args.simSeed,  # only relavant in num_episodes=1
             "testArgs": {  # additional arguments for csmarl_test
                 "--graphSeed": args.graphSeed,
                 "--layout": args.layout,
@@ -254,4 +254,6 @@ if __name__ == "__main__":
             newargs["--intensity"] += 0.1
     else:
         # Do the actual rollout.
+        if args.episodes > 1:
+            args.config["env_config"]["seed"] = 0  # do not repeat same seed
         rollout(agent, args.env, num_episodes=args.episodes)

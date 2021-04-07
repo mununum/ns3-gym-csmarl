@@ -209,6 +209,62 @@ UniformRandomVariable::GetInteger (void)
   return (uint32_t)GetValue (m_min, m_max + 1);
 }
 
+NS_OBJECT_ENSURE_REGISTERED(MyUniformRandomVariable);
+
+TypeId
+MyUniformRandomVariable::GetTypeId (void)
+{
+  static TypeId tid = TypeId ("ns3::MyUniformRandomVariable")
+    .SetParent<RandomVariableStream>()
+    .SetGroupName ("Core")
+    .AddConstructor<MyUniformRandomVariable> ()
+    ;
+  return tid;
+}
+
+MyUniformRandomVariable::MyUniformRandomVariable ()
+{
+  // m_min and m_max are initialized after constructor by attributes
+  NS_LOG_FUNCTION (this);
+}
+
+MyUniformRandomVariable::MyUniformRandomVariable (int32_t seed, double min, double max)
+{
+  m_seed = seed;
+  m_min = min;
+  m_max = max;
+
+  m_g = std::mt19937 (m_rd ());
+  m_g.seed (m_seed);
+  m_u = std::uniform_real_distribution<> (m_min, m_max);
+}
+
+double 
+MyUniformRandomVariable::GetMin (void) const
+{
+  NS_LOG_FUNCTION (this);
+  return m_min;
+}
+double 
+MyUniformRandomVariable::GetMax (void) const
+{
+  NS_LOG_FUNCTION (this);
+  return m_max;
+}
+
+double 
+MyUniformRandomVariable::GetValue (void)
+{
+  NS_LOG_FUNCTION (this);
+  return m_u (m_g);
+}
+uint32_t 
+MyUniformRandomVariable::GetInteger (void)
+{
+  NS_LOG_FUNCTION (this);
+  return (uint32_t)GetValue ();
+}
+
 NS_OBJECT_ENSURE_REGISTERED(ConstantRandomVariable);
 
 TypeId 

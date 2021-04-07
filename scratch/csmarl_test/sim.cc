@@ -40,7 +40,15 @@ SetupWifi (NodeContainer &nodes, const Ptr<const Graph> graph, const MyConfig &c
           if ((flag = !flag))
             {
               Ptr<RandomRectanglePositionAllocator> positionAllocator = CreateObject<RandomRectanglePositionAllocator> ();
-              mobility.SetMobilityModel ("ns3::RandomWaypointMobilityModel", "PositionAllocator", PointerValue (positionAllocator));
+
+              // randomly move according to graphSeed
+              uint32_t idx = i - nodes.Begin ();
+              positionAllocator->SetX (CreateObject<MyUniformRandomVariable> (config.graphSeed + idx * 3 + 1));
+              positionAllocator->SetY (CreateObject<MyUniformRandomVariable> (config.graphSeed + idx * 3 + 2));
+              Ptr<MyUniformRandomVariable> speed = CreateObject<MyUniformRandomVariable> (config.graphSeed + idx * 3 + 3, 0.3, 0.7);
+
+              mobility.SetMobilityModel ("ns3::RandomWaypointMobilityModel", "PositionAllocator", PointerValue (positionAllocator),
+                                                                             "Speed", PointerValue (speed));
               mobility.Install (*i);
 
               Ptr<MobilityModel> mobilityModel = (*i)->GetObject<MobilityModel> ();
@@ -61,7 +69,14 @@ SetupWifi (NodeContainer &nodes, const Ptr<const Graph> graph, const MyConfig &c
       for (auto i = nodes.Begin (); i != nodes.End (); i++)
         {
           Ptr<RandomRectanglePositionAllocator> positionAllocator = CreateObject<RandomRectanglePositionAllocator> ();
-          mobility.SetMobilityModel ("ns3::RandomWaypointMobilityModel", "PositionAllocator", PointerValue (positionAllocator));
+          // randomly move according to graphSeed
+          uint32_t idx = i - nodes.Begin ();
+          positionAllocator->SetX (CreateObject<MyUniformRandomVariable> (config.graphSeed + idx * 3 + 1));
+          positionAllocator->SetY (CreateObject<MyUniformRandomVariable> (config.graphSeed + idx * 3 + 2));
+          Ptr<MyUniformRandomVariable> speed = CreateObject<MyUniformRandomVariable> (config.graphSeed + idx * 3 + 3, 0.3, 0.7);
+
+          mobility.SetMobilityModel ("ns3::RandomWaypointMobilityModel", "PositionAllocator", PointerValue (positionAllocator),
+                                                                          "Speed", PointerValue (speed));
           mobility.Install (*i);
         }
     }

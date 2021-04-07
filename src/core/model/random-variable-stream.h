@@ -26,6 +26,7 @@
 #ifndef RANDOM_VARIABLE_STREAM_H
 #define RANDOM_VARIABLE_STREAM_H
 
+#include <random>  // for MyUniformRandomVariable
 #include "type-id.h"
 #include "object.h"
 #include "attribute-helper.h"
@@ -303,6 +304,32 @@ private:
   double m_max;
 
 };  // class UniformRandomVariable
+
+
+class MyUniformRandomVariable : public RandomVariableStream
+{
+public:
+  static TypeId GetTypeId (void);
+
+  MyUniformRandomVariable ();
+  MyUniformRandomVariable (int32_t seed, double min = 0.0, double max = 1.0);
+
+  double GetMin (void) const;
+  double GetMax (void) const;
+
+  virtual double GetValue (void);
+  virtual uint32_t GetInteger (void);
+
+private:
+
+  std::random_device m_rd;
+  std::mt19937 m_g;
+  std::uniform_real_distribution<> m_u;
+
+  double m_min;
+  double m_max;
+  int32_t m_seed;
+};  // class MyUniformRandomVariable
 
   
 /**

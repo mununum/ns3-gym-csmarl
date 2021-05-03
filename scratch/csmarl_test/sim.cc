@@ -266,7 +266,7 @@ main (int argc, char *argv[])
   cmd.AddValue ("stepTime", "Step time of the environment.", config.stepTime);
 
   cmd.AddValue ("graphSeed", "Seed for the graph generation.", config.graphSeed);
-  cmd.AddValue ("layout", "Topology layout (node|link).", config.layout);
+  cmd.AddValue ("layout", "Topology layout (link|node).", config.layout);
   cmd.AddValue ("loss", "Loss configuration (graph|geometric).", config.loss);
   cmd.AddValue ("topology", "Interference topology file (if loss==graph), geometric graph parameter N,d (if loss==geometric).",
                 config.topology);

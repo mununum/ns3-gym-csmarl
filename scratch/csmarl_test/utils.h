@@ -16,7 +16,7 @@ public:
   double simTime = 20;
   double stepTime = 0.005;
 
-  std::string layout = "node";  // layout: (node|link)
+  std::string layout = "link";  // layout: (link|node)
   std::string loss = "graph";  // loss: (graph|geometric)
 
   // options used in loss==graph

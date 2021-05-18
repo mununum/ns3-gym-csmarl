@@ -33,10 +33,33 @@ do
             do
                 LD_LIBRARY_PATH=../../build/lib ../../build/scratch/csmarl_test/csmarl_test \
                 --loss=geometric --topology=10,0.3 --layout=$layout --mobility=$mobility \
-                --graphSeed=$graphSeed --simSeed=$simSeed >> odcf_mobility_result/$layout-$mobility-$graphSeed.out &
+                --graphSeed=$graphSeed --simSeed=$simSeed --debug=true --algorithm=odcf \
+                >> odcf_mobility_result/$layout-$mobility-$graphSeed.out &
             done
         done
     done
     wait
 done
 
+# 80211 test
+
+rm -rf 80211_mobility_result
+mkdir -p 80211_mobility_result
+
+for simSeed in {1..5}
+do
+    for layout in node link
+    do
+        for mobility in paired random
+        do
+            for graphSeed in {0..4}
+            do
+                LD_LIBRARY_PATH=../../build/lib ../../build/scratch/csmarl_test/csmarl_test \
+                --loss=geometric --topology=10,0.3 --layout=$layout --mobility=$mobility \
+                --graphSeed=$graphSeed --simSeed=$simSeed --debug=true --algorithm=80211 \
+                >> 80211_mobility_result/$layout-$mobility-$graphSeed.out &
+            done
+        done
+    done
+    wait
+done

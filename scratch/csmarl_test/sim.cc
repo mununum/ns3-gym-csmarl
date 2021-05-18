@@ -159,7 +159,6 @@ SetupApplication (NodeContainer &nodes, const Ptr<const Graph> graph, const MyCo
       Ptr<Node> sinkNode = nodes.Get (it->second);
 
       srcNodes.Add (srcNode);
-      sinkNodes.Add (sinkNode);
 
       Ptr<Ipv4> destIpv4 = sinkNode->GetObject<Ipv4> ();
       Ipv4InterfaceAddress destIpv4IntAddr = destIpv4->GetAddress (1, 0);
@@ -176,8 +175,13 @@ SetupApplication (NodeContainer &nodes, const Ptr<const Graph> graph, const MyCo
       ApplicationContainer newSrcApps = source.Install (srcNode);
       srcApps.Add (newSrcApps);
 
-      UdpServerHelper sink (port);
-      ApplicationContainer newSinkApps = sink.Install (sinkNode);
+      if (!sinkNodes.Contains (sinkNode->GetId ()))
+        {
+          UdpServerHelper sink (port);
+          ApplicationContainer newSinkApps = sink.Install (sinkNode);
+          sinkApps.Add (newSinkApps);
+          sinkNodes.Add (sinkNode);
+        }
     }
 
   srcApps.Start (Seconds (0.0));

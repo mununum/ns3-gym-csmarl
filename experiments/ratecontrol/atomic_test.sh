@@ -16,29 +16,38 @@ wait
 rm -rf odcf_atomic_result
 mkdir -p odcf_atomic_result
 
+pwd=$PWD
+cd ../..
+
 for simSeed in {1..5}
 do
     for topology in ht ia ch2 ch3 ch4
     do
-        LD_LIBRARY_PATH=../../build/lib ../../build/scratch/csmarl_test/csmarl_test \
+        LD_LIBRARY_PATH=build/lib build/scratch/csmarl_test/csmarl_test \
         --layout=node --loss=graph --topology=$topology --debug=true --algorithm=odcf \
-        >> odcf_atomic_result/$topology.out &
+        >> $pwd/odcf_atomic_result/$topology.out &
     done
     wait
 done
+
+cd -
 
 # 80211 test
 
 rm -rf 80211_atomic_result
 mkdir -p 80211_atomic_result
 
+cd ../..
+
 for simSeed in {1..5}
 do
     for topology in ht ia ch2 ch3 ch4
     do
-        LD_LIBRARY_PATH=../../build/lib ../../build/scratch/csmarl_test/csmarl_test \
+        LD_LIBRARY_PATH=build/lib build/scratch/csmarl_test/csmarl_test \
         --layout=node --loss=graph --topology=$topology --debug=true --algorithm=80211 \
-        >> 80211_atomic_result/$topology.out &
+        >> $pwd/80211_atomic_result/$topology.out &
     done
     wait
 done
+
+cd -

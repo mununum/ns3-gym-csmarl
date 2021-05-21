@@ -399,11 +399,20 @@ GymEnv::GetSourceInterval (Ptr<Node> node)
 {
   if (m_algorithm == IEEE80211)
     {
-      Ptr<Application> app = node->GetApplication (0);
-      Ptr<UdpClient> udp = DynamicCast<UdpClient> (app);
-      TimeValue time;
-      udp->GetAttribute ("Interval", time);
-      return time.Get ();
+      uint32_t nApps = node->GetNApplications ();
+      for (uint32_t i = 0; i < nApps; i++)
+        {
+          Ptr<Application> app = node->GetApplication (i);
+          Ptr<UdpClient> udp = DynamicCast<UdpClient> (app);
+          if (PeekPointer (udp))
+            {
+              TimeValue time;
+              udp->GetAttribute ("Interval", time);
+              return time.Get ();
+            }
+        }
+
+      return Time (0);
     }
   else
     {

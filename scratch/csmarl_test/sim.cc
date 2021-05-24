@@ -18,9 +18,21 @@ SetupWifi (NodeContainer &nodes, const Ptr<const Graph> graph, const MyConfig &c
 
   // Datarate
   std::string dataRateStr = "OfdmRate12MbpsBW5MHz";
-  wifi.SetRemoteStationManager ("ns3::ConstantRateWifiManager", "DataMode",
-                                StringValue (dataRateStr), "ControlMode",
-                                StringValue (dataRateStr));
+  if (config.topology == "ht" || config.topology == "ia" || config.topology == "ch2" ||
+      config.topology == "ch3" || config.topology == "ch4")
+    {
+      // Enable RTS-CTS mechanism
+      wifi.SetRemoteStationManager ("ns3::ConstantRateWifiManager",
+                                    "DataMode", StringValue (dataRateStr),
+                                    "ControlMode", StringValue (dataRateStr),
+                                    "RtsCtsThreshold", UintegerValue (0));
+    }
+  else
+    {
+      wifi.SetRemoteStationManager ("ns3::ConstantRateWifiManager", 
+                                    "DataMode", StringValue (dataRateStr), 
+                                    "ControlMode", StringValue (dataRateStr));
+    }
 
   // Mobility
   MobilityHelper mobility;
